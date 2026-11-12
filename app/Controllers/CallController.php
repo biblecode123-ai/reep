@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DeadlineHelper;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
@@ -236,6 +237,19 @@ final class CallController
         $allowed = ['draft', 'published', 'open', 'closed', 'under_evaluation', 'completed', 'archived'];
         if (!in_array($status, $allowed, true)) {
             Session::flash('error', 'Invalid status.');
+            redirect('index.php?action=call_view&id=' . $id);
+        }
+        $call = CallModel::find($id);
+        if ($call === null) {
+            Session::flash('error', 'Research call not found.');
+            redirect('index.php?action=calls');
+        }
+        if (in_array($status, ['published', 'open'], true) && !DeadlineHelper::hasValidWindow($call)) {
+            Session::flash('error', 'Set a valid opening date and a closing date later than the opening date before publishing this call.');
+            redirect('index.php?action=call_view&id=' . $id);
+        }
+        if ($status === 'open' && !DeadlineHelper::isCallOpen(array_merge($call, ['status' => 'open']))) {
+            Session::flash('error', 'The call can only be opened during its configured submission period. Publish it to schedule the opening.');
             redirect('index.php?action=call_view&id=' . $id);
         }
         CallModel::update($id, ['status' => $status, 'closed_at' => $status === 'closed' ? date('Y-m-d H:i:s') : null]);

@@ -106,6 +106,32 @@
   </div>
 
   <div class="card">
+    <h2 class="mt0">Work plan and timeline</h2>
+    <p class="muted">List the planned activities, responsible team members, and expected outputs. At least one activity is required before submission.</p>
+    <?php
+      $workPlanRows = $workPlan ?: [
+        ['activity' => '', 'start_date' => '', 'end_date' => '', 'responsible' => '', 'expected_output' => ''],
+        ['activity' => '', 'start_date' => '', 'end_date' => '', 'responsible' => '', 'expected_output' => ''],
+        ['activity' => '', 'start_date' => '', 'end_date' => '', 'responsible' => '', 'expected_output' => ''],
+      ];
+    ?>
+    <?php foreach ($workPlanRows as $wp): ?>
+      <div class="card" style="margin:12px 0;padding:12px;">
+        <label>Activity</label>
+        <input type="text" name="wp_activity[]" maxlength="200" value="<?= e($wp['activity'] ?? '') ?>">
+        <div class="form-row">
+          <div><label>Start date</label><input type="date" name="wp_start[]" value="<?= e($wp['start_date'] ?? '') ?>"></div>
+          <div><label>End date</label><input type="date" name="wp_end[]" value="<?= e($wp['end_date'] ?? '') ?>"></div>
+        </div>
+        <div class="form-row">
+          <div><label>Responsible person / role</label><input type="text" name="wp_resp[]" maxlength="150" value="<?= e($wp['responsible'] ?? '') ?>"></div>
+          <div><label>Expected output</label><input type="text" name="wp_out[]" maxlength="250" value="<?= e($wp['expected_output'] ?? '') ?>"></div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
+  <div class="card">
     <h2 class="mt0">Proposal document</h2>
     <p>Upload the full proposal as a <strong>single PDF or Word document</strong> (`.pdf`, `.docx`).</p>
     <p>The proposal document must contain the following sections in this order: Abstract, Background, Problem statement, Objectives, Research questions, Literature review, Methodology, Expected results, Significance, Innovation, References.</p>

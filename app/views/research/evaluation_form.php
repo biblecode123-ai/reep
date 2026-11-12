@@ -392,3 +392,4 @@ window.addEventListener('beforeunload', function() {
 </script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

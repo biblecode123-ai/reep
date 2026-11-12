@@ -55,12 +55,6 @@ final class CallController
             Session::flash('error', implode(' ', $errors));
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
-        // Every call must state its research theme (§20).
-        $themeId = (int) ($_POST['theme'] ?? 0);
-        if ($themeId === 0 || Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ?', [$themeId]) == 0) {
-            Session::flash('error', 'Please select the research theme for this call.');
-            redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
-        }
         $data = [
             'title'            => $clean['title'],
             'reference_number' => $clean['reference_number'],
@@ -68,7 +62,7 @@ final class CallController
             'research_priorities' => trim((string) ($_POST['priorities'] ?? '')) ?: null,
             'opens_at'         => ($_POST['opens_at'] ?? '') ?: null,
             'closes_at'        => ($_POST['closes_at'] ?? '') ?: null,
-            'research_theme_id' => (int) ($_POST['theme'] ?? 0) ?: null,
+            'research_theme_id' => null,
         ];
         try {
             if ($id > 0) {
@@ -244,3 +238,4 @@ final class CallController
         redirect('index.php?action=call_view&id=' . $id);
     }
 }
+

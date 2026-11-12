@@ -12,3 +12,4 @@ include APP_PATH . '/views/partials/header.php';
 </ul>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

@@ -23,3 +23,4 @@ if ($univScore != $collegeScore) {
 } else {
     echo "✗ FAILED: University evaluation inherited college score.\n";
 }
+

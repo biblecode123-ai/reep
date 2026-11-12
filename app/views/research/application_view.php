@@ -109,7 +109,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
   <!-- RIGHT: workflow, evaluations, history -->
   <div>
     <div class="card">
-      <h2 class="mt0">Status timeline (§107)</h2>
+      <h2 class="mt0">Status timeline</h2>
       <?php
         $stages = ['DRAFT','SUBMITTED','COLLEGE_RECEIVED','UNDER_COLLEGE_SCREENING','EVALUATOR_ASSIGNMENT_PENDING',
                    'EVALUATOR_ASSIGNED','EVALUATOR_ACCEPTED','UNDER_EVALUATION','EVALUATION_COMPLETED',
@@ -492,7 +492,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 
     <!-- University research committee (§11–§12; Rules 8 & 9) -->
     <div class="card" id="committee">
-      <h2 class="mt0">University Research Committee <span class="muted" style="font-size:13px;font-weight:400;">(§12)</span></h2>
+      <h2 class="mt0">University Research Committee</h2>
       <?php if ($assignableCommittees): ?>
         <form method="post" action="<?= e(url('action=app_committee_assign')) ?>" style="margin-bottom:12px;">
           <?= \App\Core\Csrf::field() ?>
@@ -571,7 +571,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 
     <!-- Budget allocation (§28 step 32; Rule 13) -->
     <div class="card" id="budget">
-      <h2 class="mt0">Budget allocation <span class="muted" style="font-size:13px;font-weight:400;">(§28)</span></h2>
+      <h2 class="mt0">Budget allocation</h2>
       <dl class="kv">
         <dt>Requested</dt><dd><?= e(format_money($app['budget_requested'])) ?></dd>
         <?php if ($app['budget_approved_amount'] !== null): ?>
@@ -743,3 +743,4 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 <script src="<?= e(base_url('assets/js/team.js')) ?>"></script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

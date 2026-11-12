@@ -678,3 +678,4 @@ final class ScreeningController
         redirect($back);
     }
 }
+

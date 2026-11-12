@@ -408,3 +408,4 @@ foreach ($people as [$email, $name, $role]) {
 }
 echo str_repeat('-', 78) . PHP_EOL;
 echo "Shared demo password: " . DEMO_PASSWORD . "  (researcher@mwu.edu.et also holds principal_investigator)\n";
+

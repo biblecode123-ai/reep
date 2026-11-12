@@ -36,3 +36,4 @@ final class MonthlyReportController
         redirect('index.php?action=project_view&id=' . $projectId);
     }
 }
+

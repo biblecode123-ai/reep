@@ -27,3 +27,4 @@ final class AdminHealthController
         include APP_PATH . '/views/admin/health.php';
     }
 }
+

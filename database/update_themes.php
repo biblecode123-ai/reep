@@ -12,3 +12,4 @@ Database::run("ALTER TABLE research_themes ADD COLUMN updated_at TIMESTAMP NULL"
 Database::run("UPDATE research_themes SET created_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP");
 
 echo "Schema updated successfully.";
+

@@ -39,14 +39,6 @@
     <div class="form-row">
       <div><label><?= $user === null ? 'Initial password <span class="req">*</span>' : 'New password (leave blank to keep)' ?></label>
         <input type="password" name="password" minlength="8" <?= $user === null ? 'required' : '' ?> autocomplete="new-password"></div>
-      <?php if ($user !== null): ?>
-      <div style="display:flex;align-items:flex-end;">
-        <form method="post" action="<?= e(url('action=user_reset')) ?>" data-confirm="Force this user to change their password on next login?">
-            <?= \App\Core\Csrf::field() ?><input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
-            <button class="btn btn-danger btn-sm" type="submit">Reset Password</button>
-        </form>
-      </div>
-      <?php endif; ?>
     </div>
     <?php if ($user === null): ?>
     <h2>Roles</h2>
@@ -66,6 +58,16 @@
     <a class="btn btn-outline" href="<?= e(url('action=users')) ?>">Cancel</a>
   </div>
 </form>
+
+<?php if ($user !== null): ?>
+<div class="card" style="margin-top:20px;">
+    <h2>Security Actions</h2>
+    <form method="post" action="<?= e(url('action=user_reset')) ?>" data-confirm="Force this user to change their password on next login?">
+        <?= \App\Core\Csrf::field() ?><input type="hidden" name="id" value="<?= (int) $user['id'] ?>">
+        <button class="btn btn-danger btn-sm" type="submit">Reset Password</button>
+    </form>
+</div>
+<?php endif; ?>
 
 <script>
 document.querySelector('select[name="college_id"]').addEventListener('change', function() {
@@ -89,3 +91,4 @@ document.querySelector('select[name="college_id"]').addEventListener('change', f
 </script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

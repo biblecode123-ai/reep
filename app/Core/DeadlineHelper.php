@@ -26,3 +26,4 @@ final class DeadlineHelper
         return ($now > $closesAt);
     }
 }
+

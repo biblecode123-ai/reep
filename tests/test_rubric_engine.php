@@ -20,3 +20,4 @@ if ($total == 100) {
 } else {
     echo "✗ FAILED: Rubric does not total 100 points.\n";
 }
+

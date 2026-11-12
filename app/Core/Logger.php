@@ -40,3 +40,4 @@ final class Logger
         return $ref;
     }
 }
+

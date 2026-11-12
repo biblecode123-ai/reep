@@ -382,3 +382,4 @@ final class EvaluationModel
         Database::update('revision_requests', $data, 'id = ?', [$id]);
     }
 }
+

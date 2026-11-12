@@ -43,3 +43,4 @@ final class DecisionController
         redirect('index.php?action=application_view&id=' . $appId);
     }
 }
+

@@ -56,3 +56,4 @@ final class RubricController
         redirect('index.php?action=rubrics');
     }
 }
+

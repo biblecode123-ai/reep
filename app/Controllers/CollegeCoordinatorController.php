@@ -236,3 +236,4 @@ final class CollegeCoordinatorController
         include APP_PATH . '/views/coordinator/proposals.php';
     }
 }
+

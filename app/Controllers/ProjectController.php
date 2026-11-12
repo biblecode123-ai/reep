@@ -475,3 +475,4 @@ final class ProjectController
         redirect('index.php?action=project_view&id=' . $projectId);
     }
 }
+

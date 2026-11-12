@@ -17,3 +17,4 @@ if ($report) {
 } else {
     echo "✗ FAILED: Due report not generated.\n";
 }
+

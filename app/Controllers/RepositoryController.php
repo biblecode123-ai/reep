@@ -334,3 +334,4 @@ final class RepositoryController
         return ['total' => $total, 'rows' => $rows];
     }
 }
+

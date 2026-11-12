@@ -181,3 +181,4 @@ if ($mkSample === 'yes' || $mkSample === 'y') {
 
 echo "\nDone. Web root: public/  ·  Default URLs: index.php, login.php\n";
 echo "Next: log in, create your colleges/departments/users (or keep the samples).\n";
+

@@ -24,3 +24,4 @@ if ($id <= 0) {
 }
 
 DocumentService::download($id);
+

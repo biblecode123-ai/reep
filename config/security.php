@@ -30,3 +30,4 @@ return [
                                     'aspx', 'cgi', 'pl', 'py', 'dll', 'htaccess'],
     ],
 ];
+

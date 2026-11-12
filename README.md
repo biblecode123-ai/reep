@@ -221,3 +221,4 @@ All remaining modules' tables already exist in `database/schema.sql` — buildin
 Unresolved institutional choices are flagged in `docs/PHASE1_DESIGN.md` §9
 (e.g. WF-2 required evaluator default, WF-4 final-approval authority, RET-1 retention periods,
 DEL-1 default deadlines — all currently safe DB-configurable defaults).
+

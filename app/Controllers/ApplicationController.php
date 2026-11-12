@@ -685,3 +685,4 @@ final class ApplicationController
         echo json_encode(['ok' => true]);
     }
 }
+

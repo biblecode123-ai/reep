@@ -271,3 +271,4 @@ final class EthicsModel
         Database::update('ethics_amendments', $data, 'id = ?', [$id]);
     }
 }
+

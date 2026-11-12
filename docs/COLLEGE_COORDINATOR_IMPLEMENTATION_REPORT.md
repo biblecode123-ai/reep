@@ -618,3 +618,4 @@ All security requirements are met through existing authentication, authorization
 | `evaluation_form` | `EvaluationController::form` | `research.evaluate` | Evaluator assessment form |
 | `evaluation_submit` | `EvaluationController::submit` | `research.evaluate` | Submit evaluation |
 | `application_view` | `ApplicationController::view` | `research.view` | View proposal details |
+

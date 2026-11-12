@@ -29,3 +29,4 @@ if (!$callId) die("Failed to create call\n");
 echo "Call created with ID: $callId\n";
 
 echo "All Director Smoke Tests passed.\n";
+

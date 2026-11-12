@@ -22,3 +22,4 @@ final class Audit
         AuditLogModel::log(Auth::id(), $action, $entityType, $entityId, $old, $new, $comment);
     }
 }
+

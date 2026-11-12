@@ -40,3 +40,4 @@ jobs:
             [ -z "$file" ] && continue
             php -l "$file"
           done <<< "$changed_files"
+

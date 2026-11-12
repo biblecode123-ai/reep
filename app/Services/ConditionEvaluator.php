@@ -266,3 +266,4 @@ final class ConditionEvaluator
             : [true, null];
     }
 }
+

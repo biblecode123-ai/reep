@@ -32,3 +32,4 @@ if ($updatedUser['status'] !== 'inactive') die("Failed to deactivate user\n");
 echo "User deactivated successfully\n";
 
 echo "All Admin Smoke Tests passed.\n";
+

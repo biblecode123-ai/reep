@@ -8,3 +8,4 @@ $appId = $db->lastInsertId();
 $db->exec("INSERT INTO research_projects (project_number, application_id, title, pi_user_id, college_id, status_code) VALUES ('PROJ001', $appId, 'Test Proj', 1, 1, 'ACTIVE')");
 
 echo "Project seeded.\n";
+

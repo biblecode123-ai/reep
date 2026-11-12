@@ -117,3 +117,4 @@ $seed = convertSeed($in('seed.sql'));
 $out('sqlite_seed.sql', "-- Generated from seed.sql by make_sqlite.php — do not edit by hand.\n\n" . $seed . "\n");
 
 echo "done\n";
+

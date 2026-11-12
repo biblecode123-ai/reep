@@ -153,3 +153,4 @@ final class DashboardController
         include APP_PATH . '/views/dashboards/admin.php';
     }
 }
+

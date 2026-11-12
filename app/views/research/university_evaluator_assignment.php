@@ -27,3 +27,4 @@ include APP_PATH . '/views/partials/header.php';
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

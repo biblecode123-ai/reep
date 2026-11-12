@@ -36,7 +36,7 @@
           <?php endforeach; ?>
         </select>
       </div>
-      <div><label>Requires ethical review? (§30)</label>
+      <div><label>Requires ethical review?</label>
         <select name="requires_ethics">
           <option value="no" <?= ($app['requires_ethics'] ?? 'no') === 'no' ? 'selected' : '' ?>>No</option>
           <option value="yes" <?= ($app['requires_ethics'] ?? '') === 'yes' ? 'selected' : '' ?>>Yes</option>
@@ -64,3 +64,4 @@
 </form>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

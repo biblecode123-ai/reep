@@ -72,3 +72,4 @@ foreach ($DEPARTMENTS as $cc => $depts) {
 $cCount = (int) Database::scalar('SELECT COUNT(*) FROM colleges');
 $dCount = (int) Database::scalar('SELECT COUNT(*) FROM departments');
 echo "\nDone. Colleges: {$cCount} (renamed {$renamed}, created {$created}) · Departments: {$dCount} (re-homed {$moved}, created {$newDepts})\n";
+

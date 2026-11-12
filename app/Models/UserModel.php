@@ -197,3 +197,4 @@ final class UserModel
         return Database::all($sql, $params);
     }
 }
+

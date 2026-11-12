@@ -63,3 +63,4 @@ final class ResearcherTransformer
         return $out;
     }
 }
+

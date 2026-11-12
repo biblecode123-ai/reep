@@ -71,3 +71,4 @@ final class AgreementModel
         return ((int) Database::scalar('SELECT COALESCE(MAX(version), 0) FROM research_agreements WHERE application_id = ?', [$applicationId])) + 1;
     }
 }
+

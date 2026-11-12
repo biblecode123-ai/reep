@@ -24,3 +24,4 @@ exec('php ' . BASE_PATH . '/scripts/seed_roles.php');
 
 require BASE_PATH . '/app/autoload.php';
 require BASE_PATH . '/app/helpers/functions.php';
+

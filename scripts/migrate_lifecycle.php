@@ -344,3 +344,4 @@ if ($row !== null) {
 }
 
 echo "\n" . (count($done) === 0 ? "nothing to do — database already migrated\n" : count($done) . " change(s) applied\n");
+

@@ -65,3 +65,4 @@ foreach ($counts as $c) { $countsByStatus[$c['status']] = (int) $c['cnt']; }
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

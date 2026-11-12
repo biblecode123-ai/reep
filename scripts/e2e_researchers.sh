@@ -343,3 +343,4 @@ say "RESEARCHER VISIBILITY RESULT: $PASS passed, $FAIL failed"
 say "================================"
 [ "$FAIL" -eq 0 ] || exit 1
 exit 0
+

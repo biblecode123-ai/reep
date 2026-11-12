@@ -206,3 +206,4 @@ return [
     'audit'               => [\App\Controllers\AdminController::class, 'auditLogs', 'audit.view'],
     'health'              => [\App\Controllers\AdminHealthController::class, 'index', 'settings.manage'],
 ];
+

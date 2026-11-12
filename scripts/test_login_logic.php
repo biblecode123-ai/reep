@@ -33,3 +33,4 @@ if ($verify && $user['status'] === 'active') {
     echo "FAILED: Logic check failed.\n";
 }
 ?>
+

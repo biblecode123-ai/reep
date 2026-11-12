@@ -45,3 +45,4 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 $controllerClass::$method();
+

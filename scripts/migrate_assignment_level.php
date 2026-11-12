@@ -39,3 +39,4 @@ run("CREATE UNIQUE INDEX uq_evalassign ON evaluator_assignments (application_id,
 echo "Migration completed successfully for SQLite.
 ";
 
+

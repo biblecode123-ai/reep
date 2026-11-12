@@ -29,7 +29,7 @@ include APP_PATH . '/views/partials/header.php';
   </table>
   <?php $openConflicts = \App\Models\EvaluationModel::openConflictsForApplication((int) $app['id']); ?>
   <?php if ($openConflicts): ?>
-    <h3>Open conflicts of interest (§21)</h3>
+    <h3>Open conflicts of interest</h3>
     <?php foreach ($openConflicts as $c): ?>
     <div class="alert alert-warning">
       <strong><?= e($c['evaluator_name'] ?? 'Evaluator') ?></strong>: <?= e($c['description'] ?? 'Conflict declared') ?>
@@ -143,3 +143,4 @@ include APP_PATH . '/views/partials/header.php';
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

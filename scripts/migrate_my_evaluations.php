@@ -55,3 +55,4 @@ foreach (['college_coordinator', 'researcher'] as $roleName) {
 }
 
 echo "Migration completed.\n";
+

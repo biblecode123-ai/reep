@@ -34,3 +34,4 @@ foreach ($calls as $call) {
 }
 
 echo "Migration complete.\n";
+

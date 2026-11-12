@@ -18,3 +18,4 @@ include APP_PATH . '/views/partials/header.php';
     <button type="submit" class="btn btn-primary">Create Draft</button>
 </form>
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

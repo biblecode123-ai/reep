@@ -14,3 +14,4 @@ if ($count >= 0) {
 } else {
     echo "✗ FAILED: Dashboard query failed.\n";
 }
+

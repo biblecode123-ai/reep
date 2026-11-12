@@ -41,6 +41,22 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
         'my_evaluations' => ['My Evaluations', 'research.evaluate'],
         'repository'     => ['Repository', 'repository.view'],
     ];
+} elseif (Gate::hasRole('rpee_director')) {
+    $navMap = [
+        'director_dashboard' => ['Director Dashboard', 'research.manage'],
+        'applications'   => ['Research', 'research.view'],
+        'themes'         => ['Themes', 'research.manage'],
+        'ethics'         => ['Ethics', 'ethics.view'],
+        'projects'       => ['Projects', 'project.view'],
+        'calls_public'   => ['Calls', 'research.create'],
+        'researchers'   => ['Researchers', 'researcher.view'],
+        'committees'     => ['Committees', 'committee.manage'],
+        'repository'     => ['Repository', 'repository.view'],
+        'users'          => ['Users', 'user.view'],
+        'colleges'       => ['College', 'org.view'],
+        'settings'       => ['Settings', 'settings.manage'],
+        'audit'          => ['Audit', 'audit.view'],
+    ];
 } elseif (Gate::hasRole('college_coordinator')) {
     $navMap = [
         'coordinator_dashboard' => ['Dashboard', 'research.view'],
@@ -105,3 +121,4 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
 <?php if (!empty($mustChangePassword) || (Auth::check() && (int) Auth::user()['must_change_password'] === 1)): ?>
   <div class="alert alert-warning">You are using an initial password. Please change it on your <a href="<?= e(url('action=profile')) ?>">profile page</a>.</div>
 <?php endif; ?>
+

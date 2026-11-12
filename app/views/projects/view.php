@@ -360,3 +360,4 @@ $remaining = $budget ? (float) $budget['approved_amount'] - $released : 0;
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

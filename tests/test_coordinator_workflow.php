@@ -157,3 +157,4 @@ foreach ($testRoutes as $route) {
 echo "\n=== Test Summary ===\n";
 echo "All critical tests executed. Review results above for any failures.\n";
 echo "Note: Functional tests require actual user sessions and database state.\n";
+

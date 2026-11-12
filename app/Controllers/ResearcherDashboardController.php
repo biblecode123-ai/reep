@@ -211,3 +211,4 @@ final class ResearcherDashboardController
         return (int) round(($filled / count($fields)) * 100);
     }
 }
+

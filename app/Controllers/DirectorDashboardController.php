@@ -214,3 +214,4 @@ final class DirectorDashboardController
         include APP_PATH . '/views/dashboards/director.php';
     }
 }
+

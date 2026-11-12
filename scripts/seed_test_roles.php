@@ -40,3 +40,4 @@ foreach ($testAccounts as $account) {
     }
 }
 echo "\nTest accounts processed. Users must change their password on first login.\n";
+

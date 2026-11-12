@@ -503,3 +503,4 @@ include APP_PATH . '/views/partials/header.php';
 </section>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
+

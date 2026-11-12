@@ -29,3 +29,4 @@ if ($exists === 0) {
 } else {
     echo "Permission already granted.\n";
 }
+

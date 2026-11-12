@@ -463,3 +463,4 @@ final class AdminController
         include APP_PATH . '/views/admin/audit.php';
     }
 }
+

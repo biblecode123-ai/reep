@@ -1671,3 +1671,4 @@ CREATE TABLE number_sequences (
     PRIMARY KEY (id),
     UNIQUE KEY uq_seq (seq_key, seq_year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

@@ -153,3 +153,4 @@ au=$(db "SELECT COUNT(*) FROM audit_logs WHERE action='login'")
 say ""
 say "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" = "0" ] || exit 1
+

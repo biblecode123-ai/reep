@@ -358,3 +358,4 @@ final class ProjectModel
         return Database::insert('project_actions', $data);
     }
 }
+

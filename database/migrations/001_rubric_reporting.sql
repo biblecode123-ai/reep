@@ -48,3 +48,4 @@ CREATE TABLE monthly_reports (
     content_data TEXT NULL, -- Storing JSON/blob of report fields
     FOREIGN KEY (project_id) REFERENCES research_projects(id) ON DELETE CASCADE
 );
+

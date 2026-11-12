@@ -45,3 +45,4 @@ $pkLine        CONSTRAINT uq_app_team_member UNIQUE (application_id, user_id),
 } else {
     echo "  + table application_team_members already exists\n";
 }
+

@@ -102,3 +102,4 @@ final class AuthController
         redirect('login.php');
     }
 }
+

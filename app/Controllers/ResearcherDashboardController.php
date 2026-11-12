@@ -28,11 +28,11 @@ final class ResearcherDashboardController
                 [$userId]
             ),
             'submittedProposals' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code NOT IN ("DRAFT","WITHDRAWN")',
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("SUBMITTED","COLLEGE_RECEIVED","EVALUATOR_ASSIGNED","UNDER_EVALUATION","EVALUATION_COMPLETED","COLLEGE_APPROVED","SUBMITTED_TO_UNIVERSITY","APPROVED","BUDGET_APPROVED","FUNDED")',
                 [$userId]
             ),
             'underRevision' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code = "AWAITING_COLLEGE_REVISION"',
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code = "REVISION_REQUIRED"',
                 [$userId]
             ),
             'approvedProposals' => $scalar(

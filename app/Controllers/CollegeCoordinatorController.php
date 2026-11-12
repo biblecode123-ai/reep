@@ -25,23 +25,23 @@ final class CollegeCoordinatorController
         // Dashboard Summary Cards
         $stats = [
             'newSubmissions' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("SUBMITTED_TO_RPEE","AWAITING_COLLEGE_REVISION")',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("SUBMITTED","COLLEGE_RECEIVED")',
                 [$collegeId]
             ),
             'underEvaluation' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "UNDER_COLLEGE_EVALUATION"',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("EVALUATOR_ASSIGNED","UNDER_EVALUATION")',
                 [$collegeId]
             ),
             'awaitingDecision' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "AWAITING_COLLEGE_DECISION"',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "EVALUATION_COMPLETED"',
                 [$collegeId]
             ),
             'forwardedToUniversity' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","AWAITING_UNIVERSITY_DECISION","APPROVED","FUNDED")',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("SUBMITTED_TO_UNIVERSITY","APPROVED","BUDGET_APPROVED","FUNDED")',
                 [$collegeId]
             ),
             'collegeRejected' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "REJECTED_BY_COLLEGE"',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "REJECTED"',
                 [$collegeId]
             ),
             'activeProjects' => $scalar(

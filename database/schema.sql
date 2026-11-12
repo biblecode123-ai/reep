@@ -544,6 +544,22 @@ CREATE TABLE research_applications (
     CONSTRAINT fk_app_wf    FOREIGN KEY (workflow_id)     REFERENCES workflows (id)        ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Proposal-stage collaborators; copied into project membership on activation.
+CREATE TABLE application_team_members (
+    id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    application_id BIGINT UNSIGNED NOT NULL,
+    user_id        BIGINT UNSIGNED NOT NULL,
+    role           ENUM('PI','co_investigator') NOT NULL DEFAULT 'co_investigator',
+    status         ENUM('pending','accepted','declined') NOT NULL DEFAULT 'pending',
+    invited_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at   DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_app_team_member (application_id, user_id),
+    KEY idx_app_team_user (user_id, status),
+    CONSTRAINT fk_app_team_app FOREIGN KEY (application_id) REFERENCES research_applications (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_app_team_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE research_work_plan_items (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_id  BIGINT UNSIGNED NOT NULL,
@@ -593,7 +609,7 @@ CREATE TABLE evaluator_assignments (
     reminder_sent_at  DATETIME NULL,
     is_active         TINYINT(1) NOT NULL DEFAULT 1,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_evalassign (application_id, evaluator_user_id),
+    UNIQUE KEY uq_evalassign_stage (application_id, evaluator_user_id, assignment_level),
     KEY idx_evalassign_evaluator (evaluator_user_id, status),
     CONSTRAINT fk_ea_app FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ea_usr FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,

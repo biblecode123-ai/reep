@@ -8,7 +8,7 @@ SET NAMES utf8mb4;
 
 -- ---------------------------------------------------------------- roles (§7)
 INSERT INTO roles (name, display_name, description, is_system) VALUES
-('system_admin',          'System Administrator',                 'Full system administration', 1),
+('system_admin',          'System Administrator',                 'Technical system administration without academic decision authority', 1),
 ('rpee_director',         'RPEE Director',                        'Head of the Research, Publication, Ethics and Extension Office', 1),
 ('rpee_officer',          'RPEE Officer',                         'RPEE staff managing calls, review, budget and reporting', 1),
 ('univ_committee',        'University Research Committee Member', 'Member of the university research committee', 1),
@@ -97,9 +97,13 @@ INSERT INTO permissions (name, module, description) VALUES
 ('integrity.manage',         'system',      'Manage research integrity cases');
 
 -- ------------------------------------------------------------ role_permissions
--- System Administrator — everything
+-- System Administrator — technical account administration only.
+-- Academic decisions, research management, policy settings, evaluator assignment,
+-- and confidential academic review remain with the designated academic roles.
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'system_admin';
+SELECT r.id, p.id FROM roles r JOIN permissions p
+  ON p.name IN ('user.view','user.manage','org.view','audit.view')
+WHERE r.name = 'system_admin';
 
 -- RPEE Director — full institutional authority
 INSERT INTO role_permissions (role_id, permission_id)

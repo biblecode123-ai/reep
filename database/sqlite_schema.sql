@@ -476,6 +476,20 @@ CREATE TABLE research_applications (
     FOREIGN KEY (workflow_id)     REFERENCES workflows (id)        ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+-- Proposal-stage collaborators; copied into project membership on activation.
+CREATE TABLE application_team_members (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL,
+    user_id        INTEGER NOT NULL,
+    role TEXT CHECK (role IN ('PI','co_investigator')) NOT NULL DEFAULT 'co_investigator',
+    status TEXT CHECK (status IN ('pending','accepted','declined')) NOT NULL DEFAULT 'pending',
+    invited_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at   DATETIME NULL,
+    CONSTRAINT uq_app_team_member UNIQUE (application_id, user_id),
+    FOREIGN KEY (application_id) REFERENCES research_applications (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE research_work_plan_items (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id  INTEGER NOT NULL,
@@ -516,7 +530,7 @@ CREATE TABLE evaluator_assignments (
     decline_reason    TEXT NULL,
     reminder_sent_at  DATETIME NULL,
     is_active         INTEGER NOT NULL DEFAULT 1,
-    CONSTRAINT uq_evalassign UNIQUE (application_id, evaluator_user_id),
+    CONSTRAINT uq_evalassign_stage UNIQUE (application_id, evaluator_user_id, assignment_level),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (assigned_by)       REFERENCES users (id)                 ON DELETE SET NULL ON UPDATE CASCADE

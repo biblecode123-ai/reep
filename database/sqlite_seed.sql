@@ -93,7 +93,7 @@ INSERT INTO permissions (name, module, description) VALUES
 -- Technical administrator has no academic workflow or decision permissions.
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p
-  ON p.name IN ('user.view','user.manage','org.view','audit.view')
+  ON p.name IN ('user.view','user.manage','user.roles','org.view','org.manage','workflow.manage','settings.manage','audit.view')
 WHERE r.name = 'system_admin';
 
 INSERT INTO role_permissions (role_id, permission_id)

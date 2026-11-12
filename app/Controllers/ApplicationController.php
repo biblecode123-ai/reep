@@ -240,11 +240,12 @@ final class ApplicationController
         $isSameCollegeCoordinator = $isCoordinator
             && (int) (Auth::user()['college_id'] ?? 0) > 0
             && (int) (Auth::user()['college_id'] ?? 0) === (int) $app['college_id'];
-        // University-level reviewers may see the institutional queue; college
-        // coordinators are deliberately excluded from this global permission path.
-        $isInstitutionalReviewer = Gate::allows('research.review')
-            && !$isCoordinator;
-        $canManage = Gate::allows('research.manage') || $isInstitutionalReviewer;
+        // Only designated Directorate officers have institution-wide access.
+        // Committee members must rely on an explicit committee assignment;
+        // the broad research.review permission alone is not an entity grant.
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isInstitutionalReviewer = $isDirectorateOfficer && Gate::allows('research.review');
+        $canManage = $isDirectorateOfficer && Gate::allows('research.manage');
         $committeeAssignment = \App\Models\CommitteeModel::activeAssignment($id);
         $isCommitteeMember = $committeeAssignment !== null
             && \App\Models\CommitteeModel::isMember((int) $committeeAssignment['committee_id'], Auth::id());

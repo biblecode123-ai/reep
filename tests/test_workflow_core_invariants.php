@@ -6,6 +6,7 @@ use App\Core\DeadlineHelper;
 use App\Core\Settings;
 use App\Models\CallModel;
 use App\Models\RubricModel;
+use App\Services\RubricScoringService;
 use App\Services\ConditionEvaluator;
 
 require __DIR__ . '/bootstrap.php';
@@ -99,6 +100,28 @@ $check('criteria without indicators are rejected', RubricModel::validateDefiniti
 $duplicateIndicators = $validRubric;
 $duplicateIndicators[0]['indicators'][1]['name'] = 'Indicator A1';
 $check('duplicate indicator names within a criterion are rejected', RubricModel::validateDefinition($duplicateIndicators) !== []);
+
+$rubricFixture = [
+    'criteria' => [
+        ['indicators' => [
+            ['id' => 101, 'name' => 'Indicator one', 'max_points' => 3, 'is_required' => 1],
+            ['id' => 102, 'name' => 'Indicator two', 'max_points' => 2, 'is_required' => 1],
+        ]],
+    ],
+];
+$validScores = RubricScoringService::validate($rubricFixture, ['score_101' => '2.5', 'score_102' => '2'], true);
+$check('indicator scores accept valid raw points and total them', $validScores['errors'] === [] && abs($validScores['total'] - 4.5) < 0.001);
+$missingScores = RubricScoringService::validate($rubricFixture, ['score_101' => '2.5'], true);
+$check('submission requires every required indicator score', $missingScores['errors'] !== []);
+$excessScores = RubricScoringService::validate($rubricFixture, ['score_101' => '3.1', 'score_102' => '2'], true);
+$check('indicator scores above their individual maximum are rejected', $excessScores['errors'] !== []);
+$schemaHasRubrics = (int) Database::scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('rubric_templates','rubric_criteria','rubric_indicators','rubric_indicator_scores')"
+);
+$check('SQLite schema contains all versioned rubric tables', $schemaHasRubrics === 4);
+$evaluationColumns = Database::all("PRAGMA table_info(evaluations)");
+$evaluationColumnNames = array_column($evaluationColumns, 'name');
+$check('evaluations retain a rubric version and immutable snapshot', in_array('rubric_template_id', $evaluationColumnNames, true) && in_array('rubric_snapshot', $evaluationColumnNames, true));
 
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),

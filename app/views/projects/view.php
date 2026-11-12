@@ -238,30 +238,25 @@ $remaining = $budget ? (float) $budget['approved_amount'] - $released : 0;
       <?php endforeach; ?>
       <?php endif; ?>
 
-      <?php if ($canReport && in_array($project['status_code'], ['ACTIVE', 'PROGRESS_MONITORING', 'SUSPENDED'], true)): ?>
+      <?php if ($canReport && in_array($project['status_code'], ['ACTIVE', 'PROGRESS_MONITORING'], true)): ?>
       <details style="margin-top:12px;">
-        <summary style="cursor:pointer;font-weight:600;">Submit progress report</summary>
-        <form method="post" action="<?= e(url('action=project_report_submit')) ?>" enctype="multipart/form-data" style="margin-top:8px;">
+        <summary style="cursor:pointer;font-weight:600;">Submit monthly progress report</summary>
+        <form method="post" action="<?= e(url('action=monthly_report_submit')) ?>" enctype="multipart/form-data" style="margin-top:8px;">
           <?= Csrf::field() ?>
           <input type="hidden" name="project_id" value="<?= (int) $project['id'] ?>">
           <div class="form-row">
-            <div><label>Reporting period</label><input type="text" name="reporting_period" placeholder="e.g. Jan–Mar 2027"></div>
-            <div><label>Progress %</label><input type="number" name="progress_pct" min="0" max="100" required></div>
+            <div><label>Reporting month</label><input type="month" name="year_month" value="<?= e(date('Y-m')) ?>" required></div>
+            <div><label>Progress %</label><input type="number" name="progress_pct" min="0" max="100" step="0.1" required></div>
           </div>
-          <div class="form-row">
-            <div><label>Period start</label><input type="date" name="period_start"></div>
-            <div><label>Period end</label><input type="date" name="period_end"></div>
-          </div>
-          <label>Completed activities</label><textarea name="completed_activities" style="min-height:60px;"></textarea>
+          <label>Completed activities</label><textarea name="completed_activities" style="min-height:60px;" required></textarea>
           <label>Pending activities</label><textarea name="pending_activities" style="min-height:60px;"></textarea>
           <label>Challenges</label><textarea name="challenges" style="min-height:60px;"></textarea>
           <label>Achievements</label><textarea name="achievements" style="min-height:60px;"></textarea>
           <div class="form-row">
             <div><label>Financial progress %</label><input type="number" name="financial_progress_pct" min="0" max="100" step="0.1"></div>
-            <div><label>Amount spent to date</label><input type="number" name="amount_spent" step="0.01" min="0"></div>
+            <div><label>Amount spent to date</label><input type="number" name="amount_spent_to_date" step="0.01" min="0"></div>
           </div>
-          <label>Supporting document (optional)</label><input type="file" name="report_document">
-          <button class="btn" type="submit">Submit report</button>
+          <button class="btn" type="submit">Submit monthly report</button>
         </form>
       </details>
       <?php endif; ?>

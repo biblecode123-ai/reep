@@ -125,6 +125,18 @@ return [
     'project_milestone_update' => [\App\Controllers\ProjectController::class, 'updateMilestone', 'project.report'],
     'project_report_submit' => [\App\Controllers\ProjectController::class, 'submitReport', 'project.report'],
     'project_report_review' => [\App\Controllers\ProjectController::class, 'reviewReport', 'research.screen'],
+
+    // Completed research report: independent college and university evaluation.
+    'final_report_submit' => [\App\Controllers\FinalReportController::class, 'submit', 'project.report'],
+    'final_report_view' => [\App\Controllers\FinalReportController::class, 'view', 'research.view'],
+    'final_report_assign_college' => [\App\Controllers\FinalReportController::class, 'assignCollegeEvaluators', 'research.assign'],
+    'final_report_assign_university' => [\App\Controllers\FinalReportController::class, 'assignUniversityEvaluators', 'research.assign'],
+    'final_report_assignment_respond' => [\App\Controllers\FinalReportController::class, 'respond', 'research.evaluate'],
+    'final_report_evaluation_form' => [\App\Controllers\FinalReportController::class, 'evaluationForm', 'research.evaluate'],
+    'final_report_evaluation_save' => [\App\Controllers\FinalReportController::class, 'saveDraft', 'research.evaluate'],
+    'final_report_evaluation_submit' => [\App\Controllers\FinalReportController::class, 'submitEvaluation', 'research.evaluate'],
+    'final_report_forward' => [\App\Controllers\FinalReportController::class, 'forwardToUniversity', 'research.screen'],
+    'final_report_decide' => [\App\Controllers\FinalReportController::class, 'finalDecision', 'research.manage'],
     'project_release_funds' => [\App\Controllers\ProjectController::class, 'releaseFunds', 'budget.release'],
     'project_extension_request' => [\App\Controllers\ProjectController::class, 'requestExtension', 'project.report'],
     'project_extension_decide' => [\App\Controllers\ProjectController::class, 'decideExtension', 'research.screen'],

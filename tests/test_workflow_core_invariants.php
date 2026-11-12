@@ -5,6 +5,7 @@ use App\Core\Database;
 use App\Core\DeadlineHelper;
 use App\Core\Settings;
 use App\Models\CallModel;
+use App\Models\RubricModel;
 use App\Services\ConditionEvaluator;
 
 require __DIR__ . '/bootstrap.php';

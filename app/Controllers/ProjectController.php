@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Models\ApplicationModel;
 use App\Models\EthicsModel;
 use App\Models\ProjectModel;
+use App\Models\FinalReportModel;
 use App\Services\NotificationService;
 use App\Services\NumberingService;
 use App\Services\WorkflowService;
@@ -205,6 +206,13 @@ final class ProjectController
         $members = ProjectModel::members($id);
         $milestones = ProjectModel::milestones($id);
         $reports = ProjectModel::reports($id);
+        $latestFinalReport = FinalReportModel::latestForProject($id);
+        $finalReport = $latestFinalReport !== null
+            ? FinalReportModel::find((int) $latestFinalReport['id'])
+            : null;
+        $canSubmitFinalReport = $isPi
+            && in_array((string) $project['status_code'], ['ACTIVE','PROGRESS_MONITORING'], true)
+            && ($finalReport === null || in_array($finalReport['status'], ['college_revision_required','university_revision_required'], true));
         $budget = ProjectModel::budget($id);
         $budgetItems = $budget ? ProjectModel::budgetItems((int) $budget['id']) : [];
         $releases = ProjectModel::fundingReleases($id);

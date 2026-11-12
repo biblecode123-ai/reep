@@ -579,10 +579,10 @@ final class ScreeningController
                 ]);
                 [$ok, $error] = WorkflowService::fire($app, 'research_application', $transition, $comment);
                 if (!$ok) {
-                    throw new \\RuntimeException($error ?? 'College decision transition failed.');
+                    throw new \RuntimeException($error ?? 'College decision transition failed.');
                 }
             });
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             Session::flash('error', $e->getMessage());
             redirect('index.php?action=application_view&id=' . $id);
         }
@@ -591,7 +591,7 @@ final class ScreeningController
         if ($decision === 'forward_to_university') {
             NotificationService::send((int) $app['pi_user_id'], 'proposal_forwarded', 'Proposal forwarded to university',
                 'Your proposal has been forwarded to university-level evaluation.', 'index.php?action=application_view&id=' . $id, 'high');
-            NotificationService::sendToRoles(['research_director', 'rpee_officer'], 'university_evaluation_pending',
+            NotificationService::sendToRoles(['rpee_director', 'rpee_officer'], 'university_evaluation_pending',
                 'College proposal forwarded', 'A proposal requires university-level evaluation.', 'index.php?action=application_view&id=' . $id, 'high');
         } elseif ($decision === 'reject_at_college') {
             NotificationService::send((int) $app['pi_user_id'], 'proposal_rejected', 'Proposal rejected at college level',

@@ -266,7 +266,10 @@ final class DocumentService
                 )),
             'research_application' => (bool) Database::scalar(
                 'SELECT COUNT(*) FROM research_applications WHERE id = ? AND pi_user_id = ?',
-                [(int) $doc['entity_id'], Auth::id()]),
+                [(int) $doc['entity_id'], Auth::id()])
+                || (bool) Database::scalar(
+                    'SELECT COUNT(*) FROM application_team_members WHERE application_id = ? AND user_id = ? AND status = "accepted"',
+                    [(int) $doc['entity_id'], Auth::id()]),
             'research_project' => (bool) Database::scalar(
                 'SELECT COUNT(*) FROM research_project_members WHERE project_id = ? AND user_id = ? AND status = "active"',
                 [(int) $doc['entity_id'], Auth::id()]),
@@ -285,7 +288,9 @@ final class DocumentService
         // Coordinators/RPEE/evaluators of the entity's college or assignment.
         if ($doc['entity_type'] === 'research_application') {
             $assigned = (bool) Database::scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1
+                   AND status NOT IN ("conflict_declared", "declined", "cancelled")',
                 [(int) $doc['entity_id'], Auth::id()]
             );
             if ($assigned) {

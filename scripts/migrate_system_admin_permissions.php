@@ -18,7 +18,7 @@ if ($roleId === null) {
     exit(1);
 }
 
-$allowed = ['user.view', 'user.manage', 'org.view', 'audit.view'];
+$allowed = ['user.view', 'user.manage', 'user.roles', 'org.view', 'org.manage', 'workflow.manage', 'settings.manage', 'audit.view'];
 
 Database::transaction(function () use ($roleId, $allowed): void {
     Database::run('DELETE FROM role_permissions WHERE role_id = ?', [(int) $roleId]);

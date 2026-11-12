@@ -20,11 +20,8 @@ final class DeadlineHelper
         }
     }
 
-    public static function isCallOpen(array $call): bool
+    public static function hasValidWindow(array $call): bool
     {
-        if (!in_array((string) ($call['status'] ?? ''), ['published', 'open'], true)) {
-            return false;
-        }
         $opensAt = trim((string) ($call['opens_at'] ?? ''));
         $closesAt = trim((string) ($call['closes_at'] ?? ''));
         if ($opensAt === '' || $closesAt === '') {
@@ -32,10 +29,26 @@ final class DeadlineHelper
         }
         try {
             $timezone = self::timezone();
-            $now = new DateTimeImmutable('now', $timezone);
             $opens = new DateTimeImmutable($opensAt, $timezone);
             $closes = new DateTimeImmutable($closesAt, $timezone);
-            return $closes > $opens && $now >= $opens && $now < $closes;
+            return $closes > $opens;
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    public static function isCallOpen(array $call): bool
+    {
+        if (!in_array((string) ($call['status'] ?? ''), ['published', 'open'], true)
+            || !self::hasValidWindow($call)) {
+            return false;
+        }
+        try {
+            $timezone = self::timezone();
+            $now = new DateTimeImmutable('now', $timezone);
+            $opens = new DateTimeImmutable((string) $call['opens_at'], $timezone);
+            $closes = new DateTimeImmutable((string) $call['closes_at'], $timezone);
+            return $now >= $opens && $now < $closes;
         } catch (Throwable) {
             return false;
         }

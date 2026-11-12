@@ -157,6 +157,18 @@ $check('MySQL seed contains college and university evaluator settings', str_cont
 $check('MySQL seed contains independent completed-report passing thresholds', str_contains($mysqlSeed, "'college_report_passing_score'") && str_contains($mysqlSeed, "'university_report_passing_score'"));
 $documentServiceSource = file_get_contents(BASE_PATH . '/app/Services/DocumentService.php');
 $check('technical system administrator has no unconditional document-access bypass', !str_contains($documentServiceSource, 'if (Gate::isAdmin())'));
+$mysqlSchema = file_get_contents(BASE_PATH . '/database/schema.sql');
+$check('MySQL monthly reports are unique per project and period', str_contains($mysqlSchema, 'uq_progress_project_period'));
+$sqliteSchema = file_get_contents(BASE_PATH . '/database/sqlite_schema.sql');
+$check('SQLite monthly reports are unique per project and period', str_contains($sqliteSchema, 'uq_progress_project_period'));
+$monthlyControllerSource = file_get_contents(BASE_PATH . '/app/Controllers/MonthlyReportController.php');
+$check('monthly submission accepts canonical YYYY-MM periods', str_contains($monthlyControllerSource, "year_month") && str_contains($monthlyControllerSource, "preg_match"));
+$monthlyServiceSource = file_get_contents(BASE_PATH . '/app/Services/MonthlyReportService.php');
+$check('monthly scheduler has configurable due/reminder settings', str_contains($monthlyServiceSource, 'monthly_report_due_day') && str_contains($monthlyServiceSource, 'monthly_report_reminder_days'));
+$check('monthly scheduler never creates a second monthly_reports repository', !str_contains($monthlyServiceSource, 'INSERT INTO monthly_reports'));
+$routesSource = file_get_contents(BASE_PATH . '/routes/web.php');
+$check('legacy progress-report route uses the canonical monthly controller', str_contains($routesSource, "'project_report_submit' => [\\App\\Controllers\\MonthlyReportController::class, 'submit'"));
+
 
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),

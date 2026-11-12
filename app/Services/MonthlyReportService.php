@@ -1,10 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace AppServices;
+namespace App\Services;
 
-use AppCoreAudit;
-use AppCoreDatabase;
+use App\Core\Audit;
+use App\Core\Database;
+use App\Core\Settings;
+use App\Services\NotificationService;
 
 /**
  * Canonical monthly-report scheduler.
@@ -23,7 +25,7 @@ final class MonthlyReportService
     /**
      * Return active projects that have no submitted/approved report for the period.
      */
-    public static function dueProjects(?string $period = null): array
+    public static function dueProjects(?string $period = null, ?int $userId = null): array
     {
         $period ??= self::currentPeriod();
 
@@ -32,6 +34,13 @@ final class MonthlyReportService
             throw new \InvalidArgumentException('Invalid reporting period: ' . $period);
         }
         $periodEnd = $periodStart->modify('last day of this month')->format('Y-m-d');
+        
+        $params = [$periodEnd, $period];
+        $userFilter = '';
+        if ($userId) {
+            $userFilter = ' AND p.pi_user_id = ?';
+            $params[] = $userId;
+        }
 
         return Database::all(
             'SELECT p.id, p.project_number, p.title, p.pi_user_id, p.college_id
@@ -43,9 +52,9 @@ final class MonthlyReportService
                  WHERE pr.project_id = p.id
                    AND pr.reporting_period = ?
                    AND pr.status IN ("submitted","approved","revision_required")
-               )
+               )' . $userFilter . '
              ORDER BY p.id',
-            [$periodEnd, $period]
+            $params
         );
     }
 

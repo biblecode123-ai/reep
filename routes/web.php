@@ -198,6 +198,7 @@ return [
     'workflow_toggle'     => [\App\Controllers\WorkflowController::class, 'toggleTransition', 'workflow.manage'],
 
     // Administration
+    'admin_dashboard'     => [\App\Controllers\AdminDashboardController::class, 'index', 'reports.view'],
     'users'               => [\App\Controllers\AdminController::class, 'users', 'user.view'],
     'user_form'           => [\App\Controllers\AdminController::class, 'userForm', 'user.manage'],
     'user_save'           => [\App\Controllers\AdminController::class, 'userSave', 'user.manage'],

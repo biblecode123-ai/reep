@@ -59,7 +59,7 @@
                         <td><?= e($a['college_name'] ?? '') ?></td>
                         <td><?= e(format_date($a['submitted_at'])) ?></td>
                         <td>
-                            <a class="btn-sm" href="<?= e(url('action=app_committee_assign&id=' . $a['id'])) ?>">Assign Committee</a>
+                            <a class="btn-sm" href="<?= e(url('committee_assign&id=' . $a['id'])) ?>">Assign Committee</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

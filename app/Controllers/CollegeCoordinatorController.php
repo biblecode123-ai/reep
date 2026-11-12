@@ -7,7 +7,8 @@ use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Models\ApplicationModel;
-use App\Models\ProjectModel;
+use App\Services\EvaluatorAssignmentService;
+use App\Services\MonthlyReportingService;
 
 final class CollegeCoordinatorController
 {
@@ -61,9 +62,10 @@ final class CollegeCoordinatorController
                 'SELECT COUNT(*) FROM progress_reports pr
                  JOIN research_projects p ON p.id = pr.project_id
                  JOIN research_applications a ON a.id = p.application_id
-                 WHERE a.college_id = ? AND pr.status = "submitted" AND pr.period_end < date("now")',
+                 WHERE a.college_id = ? AND pr.status != "approved" AND pr.period_end < date("now")',
                 [$collegeId]
             ),
+
         ];
 
         // Proposals by Status

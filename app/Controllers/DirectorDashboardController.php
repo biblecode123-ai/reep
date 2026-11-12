@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Auth;
 use App\Core\Database;
 use App\Core\Gate;
+use App\Services\MonthlyReportingService;
 
 final class DirectorDashboardController
 {
@@ -26,13 +27,8 @@ final class DirectorDashboardController
             'openRejectedAppeals' => $scalar('SELECT COUNT(*) FROM appeals WHERE appealable_type = "rejection" AND status IN ("submitted","under_review")'),
             'appealsAwaitingCommittee' => $scalar('SELECT COUNT(*) FROM appeals WHERE status = "submitted"'),
             'agreementsPending' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued","awaiting_signature")'),
-            'activeProjectsAttention' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "ACTIVE"'),
-            'reportingStats' => [
-                'expected' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status IN ("due","overdue")'),
-                'submitted' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "submitted"'),
-                'reviewed' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "reviewed"'),
-                'overdue' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "overdue"'),
-            ],
+            'activeProjectsAttention' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code IN ("ACTIVE", "PROGRESS_MONITORING")'),
+            'reportingStats' => MonthlyReportingService::getStats(),
             'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports WHERE status IN ("submitted","approved")'),
         ];
 
@@ -42,7 +38,7 @@ final class DirectorDashboardController
              FROM research_applications a
              JOIN users u ON u.id = a.pi_user_id
              LEFT JOIN colleges c ON c.id = a.college_id
-             WHERE a.status_code IN ("SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION")
+             WHERE a.status_code = "UNIV_EVAL_ASSIGNMENT_PENDING"
              ORDER BY a.submitted_at DESC LIMIT 20'
         );
 

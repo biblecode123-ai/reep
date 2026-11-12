@@ -100,12 +100,20 @@ final class AdminController
             $data['password_hash'] = password_hash((string) $_POST['password'], PASSWORD_BCRYPT, ['cost' => 12]);
             $data['must_change_password'] = 1;
         }
-        $roleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
+        // Modified to prevent accidental role removal during profile update
+        $roleIds = null;
+        if (isset($_POST['roles'])) {
+            $roleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
+        }
 
         try {
             if ($id > 0) {
                 UserModel::update($id, $data, $roleIds);
-                Audit::log('user.updated', 'user', $id, null, ['roles' => $roleIds]);
+                if ($roleIds !== null) {
+                    Audit::log('user.updated', 'user', $id, null, ['roles' => $roleIds]);
+                } else {
+                    Audit::log('user.updated', 'user', $id);
+                }
                 Session::flash('success', 'User updated.');
             } else {
                 if (empty($_POST['password'])) {
@@ -177,7 +185,19 @@ final class AdminController
         Gate::authorize('user.roles');
         Csrf::verifyRequest();
         $id = (int) ($_POST['id'] ?? 0);
-        $roleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
+        $submittedRoleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
+        
+        // Validate against authorized roles (4 roles)
+        $authorized = Database::all('SELECT id FROM roles WHERE name IN (?, ?, ?, ?)', ['system_admin', 'rpee_director', 'college_coordinator', 'researcher']);
+        $authorizedIds = array_column($authorized, 'id');
+        
+        $roleIds = [];
+        foreach ($submittedRoleIds as $rid) {
+            if (in_array($rid, $authorizedIds, true)) {
+                $roleIds[] = $rid;
+            }
+        }
+        
         UserModel::update($id, [], $roleIds);
         Gate::flush();
         Audit::log('user.roles_changed', 'user', $id, null, ['roles' => $roleIds]);

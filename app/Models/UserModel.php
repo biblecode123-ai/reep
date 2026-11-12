@@ -124,12 +124,26 @@ final class UserModel
     public static function update(int $id, array $data, ?array $roleIds = null): void
     {
         Database::transaction(function () use ($id, $data, $roleIds): void {
-            Database::update('users', $data, 'id = ?', [$id]);
             if ($roleIds !== null) {
+                // Safeguard: Prevent removing last system_admin if this user is a system_admin
+                $adminRoleId = (int)Database::scalar('SELECT id FROM roles WHERE name = ?', ['system_admin']);
+                $isSystemAdmin = (bool)Database::scalar('SELECT 1 FROM user_roles WHERE user_id = ? AND role_id = ?', [$id, $adminRoleId]);
+                
+                if ($isSystemAdmin) {
+                    $otherAdminCount = (int)Database::scalar('SELECT COUNT(*) FROM user_roles WHERE role_id = ? AND user_id != ?', [$adminRoleId, $id]);
+                    
+                    if ($otherAdminCount === 0 && !in_array($adminRoleId, $roleIds, true)) {
+                        throw new \Exception('Cannot remove the last System Administrator.');
+                    }
+                }
+                
                 Database::run('DELETE FROM user_roles WHERE user_id = ?', [$id]);
                 foreach ($roleIds as $roleId) {
-                    Database::upsert('user_roles', ['user_id' => $id, 'role_id' => (int) $roleId], ['user_id', 'role_id'], ['user_id' => 'user_id']);
+                    Database::insert('user_roles', ['user_id' => $id, 'role_id' => (int) $roleId]);
                 }
+            }
+            if (!empty($data)) {
+                Database::update('users', $data, 'id = ?', [$id]);
             }
         });
     }
@@ -149,10 +163,11 @@ final class UserModel
             $like = '%' . $filters['q'] . '%';
             $params[] = $like; $params[] = $like; $params[] = $like;
         }
-        if (!empty($filters['college_id'])) {
+        if (!empty($filters['college'])) {
             $where[] = 'u.college_id = ?';
-            $params[] = (int) $filters['college_id'];
+            $params[] = (int) $filters['college'];
         }
+
         if (!empty($filters['department_id'])) {
             $where[] = 'u.department_id = ?';
             $params[] = (int) $filters['department_id'];

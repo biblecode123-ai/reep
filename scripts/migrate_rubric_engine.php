@@ -98,4 +98,8 @@ if (!$tableExists('rubric_indicator_scores')) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 }
 
-echo "Versioned indicator-level rubric tables and evaluation snapshot columns are installed. No rubric templates were fabricated or activated.\n";
+if ($tableExists('university_budget_recommendations') && !$columnExists('university_budget_recommendations', 'justification')) {
+    Database::run('ALTER TABLE university_budget_recommendations ADD COLUMN justification TEXT NULL AFTER amount');
+}
+
+echo "Versioned indicator-level rubric tables, evaluation snapshot columns, and university budget justification are installed. No rubric templates were fabricated or activated.\n";

@@ -54,11 +54,20 @@ $check('closed status remains closed even if close date is future', DeadlineHelp
 [$conditionOk, $conditionError] = ConditionEvaluator::check('not_a_real_condition', 'research_application', 999999, []);
 $check('unknown workflow conditions fail closed', $conditionOk === false && is_string($conditionError) && $conditionError !== '');
 
-$workflowConditions = Database::all(
-    'SELECT DISTINCT condition_key FROM workflow_transitions WHERE condition_key IS NOT NULL'
+$seedSql = (string) file_get_contents(BASE_PATH . '/database/sqlite_seed.sql');
+$transitionStart = strpos($seedSql, 'INSERT INTO workflow_transitions');
+$transitionEnd = $transitionStart === false ? false : strpos($seedSql, ';', $transitionStart);
+$transitionSql = ($transitionStart !== false && $transitionEnd !== false)
+    ? substr($seedSql, $transitionStart, $transitionEnd - $transitionStart)
+    : '';
+preg_match_all(
+    "/,\\s*'[^']*'\\s*,\\s*(?:'[^']*'|NULL)\\s*,\\s*'([^']*)'\\s*,\\s*\\d+\\s*\\)/",
+    $transitionSql,
+    $conditionMatches
 );
-foreach ($workflowConditions as $row) {
-    $key = (string) $row['condition_key'];
+$workflowConditions = array_values(array_unique($conditionMatches[1] ?? []));
+$check('workflow transition seed contains condition rules', count($workflowConditions) > 0);
+foreach ($workflowConditions as $key) {
     [, $error] = ConditionEvaluator::check($key, 'not_a_research_entity', 999999, []);
     $check(
         'configured workflow condition is implemented: ' . $key,

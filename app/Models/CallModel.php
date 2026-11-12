@@ -53,7 +53,7 @@ final class CallModel
              WHERE c.status IN ('published','open')
              ORDER BY c.opens_at ASC"
         );
-        return array_values(array_filter($calls, static fn(array $call): bool => DeadlineHelper::hasValidWindow($call) && !DeadlineHelper::hasCallClosed($call)));
+        return array_values(array_filter($calls, static fn(array $call): bool => DeadlineHelper::isCallOpen($call)));
     }
 
     public static function find(int $id): ?array

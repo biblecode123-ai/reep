@@ -43,8 +43,12 @@ DROP TABLE IF EXISTS university_decisions;
 DROP TABLE IF EXISTS college_decisions;
 DROP TABLE IF EXISTS revision_responses;
 DROP TABLE IF EXISTS revision_requests;
+DROP TABLE IF EXISTS rubric_indicator_scores;
 DROP TABLE IF EXISTS evaluation_comments;
 DROP TABLE IF EXISTS evaluation_scores;
+DROP TABLE IF EXISTS rubric_indicators;
+DROP TABLE IF EXISTS rubric_criteria;
+DROP TABLE IF EXISTS rubric_templates;
 DROP TABLE IF EXISTS evaluations;
 DROP TABLE IF EXISTS evaluation_criteria;
 DROP TABLE IF EXISTS evaluator_conflicts;
@@ -408,6 +412,44 @@ CREATE TABLE evaluation_criteria (
     FOREIGN KEY (call_id) REFERENCES research_calls (id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Four independent, versioned 100-point institutional evaluation rubrics.
+CREATE TABLE rubric_templates (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rubric_type TEXT CHECK (rubric_type IN ('college_proposal','college_completed_report','university_proposal','university_completed_report')) NOT NULL,
+    name        TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    is_active   INTEGER NOT NULL DEFAULT 0,
+    created_by  INTEGER NULL,
+    approved_by INTEGER NULL,
+    approved_at DATETIME NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_rubric_version UNIQUE (rubric_type, version),
+    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_criteria (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    max_points  NUMERIC NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_rubric_criterion_name UNIQUE (template_id, name),
+    FOREIGN KEY (template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_indicators (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    criterion_id INTEGER NOT NULL,
+    name         TEXT NOT NULL,
+    description  TEXT NULL,
+    max_points   NUMERIC NOT NULL,
+    is_required  INTEGER NOT NULL DEFAULT 1,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_rubric_indicator_name UNIQUE (criterion_id, name),
+    FOREIGN KEY (criterion_id) REFERENCES rubric_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 CREATE TABLE research_applications (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
     application_number       TEXT NOT NULL,          -- MWU-RPEE-APP-YYYY-NNNN
@@ -573,7 +615,7 @@ CREATE TABLE evaluations (
     updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_eval_assignment_round UNIQUE (assignment_id, evaluation_round),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,\n    FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (amended_from_id)   REFERENCES evaluations (id)           ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -587,6 +629,19 @@ CREATE TABLE evaluation_scores (
     CONSTRAINT uq_escore UNIQUE (evaluation_id, criterion_id),
     FOREIGN KEY (evaluation_id) REFERENCES evaluations (id)            ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (criterion_id)  REFERENCES research_call_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_indicator_scores (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    evaluation_id  INTEGER NOT NULL,
+    indicator_id   INTEGER NOT NULL,
+    score          NUMERIC NOT NULL,
+    comment        TEXT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_rubric_indicator_score UNIQUE (evaluation_id, indicator_id),
+    FOREIGN KEY (evaluation_id) REFERENCES evaluations (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (indicator_id) REFERENCES rubric_indicators (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE evaluation_comments (

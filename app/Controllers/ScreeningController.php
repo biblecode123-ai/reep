@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Core\Validator;
 use App\Models\ApplicationModel;
 use App\Models\EvaluationModel;
@@ -129,6 +130,11 @@ final class ScreeningController
 
     public static function assignEvaluatorForm(): void
     {
+        if (!Gate::hasRole('college_coordinator')) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
+        }
         Gate::authorize('research.assign');
         $id = (int) ($_GET['id'] ?? 0);
         $app = ApplicationModel::find($id);
@@ -137,7 +143,18 @@ final class ScreeningController
             redirect('index.php?action=applications');
         }
         self::assertCollegeScope($app, 'index.php?action=application_view&id=' . $id);
-        $assignments = EvaluationModel::assignmentsFor($id);
+        if (!in_array((string) ($app['status_code'] ?? ''), ['EVALUATOR_ASSIGNMENT_PENDING', 'EVALUATOR_ASSIGNED', 'UNDER_EVALUATION'], true)) {
+            Session::flash('error', 'College evaluators can only be assigned while college evaluation is pending or in progress.');
+            redirect('index.php?action=application_view&id=' . $id);
+        }
+        $assignments = Database::all(
+            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND assignment_level = "college" AND is_active = 1',
+            [$id]
+        );
+        $requiredEvaluators = max(1, (int) (Database::scalar(
+            'SELECT required_evaluators FROM research_calls WHERE id = ?',
+            [(int) $app['call_id']]
+        ) ?? Settings::int('college_evaluators_default', 1)));
 
         // Get proposal team members (PI and co-investigators).
         // application_team_members is the proposal-stage team table; research_project_members
@@ -159,7 +176,7 @@ final class ScreeningController
              FROM users u
              JOIN user_roles ur ON ur.user_id = u.id
              JOIN roles r ON r.id = ur.role_id
-             LEFT JOIN research_evaluators re ON re.user_id = u.id
+             JOIN research_evaluators re ON re.user_id = u.id
              LEFT JOIN departments d ON d.id = u.department_id
              LEFT JOIN colleges c ON c.id = u.college_id
              WHERE r.name = "evaluator" AND u.status = "active" AND u.college_id = ?
@@ -192,7 +209,7 @@ final class ScreeningController
             // Check 4: Max concurrent evaluations not exceeded
             $currentLoad = EvaluationModel::workloadFor($evId);
             $maxLoad = (int) ($ev['max_concurrent_evaluations'] ?? 5);
-            if ($currentLoad >= $maxLoad) {
+            if ($maxLoad > 0 && $currentLoad >= $maxLoad) {
                 $reasons[] = 'at maximum capacity';
             }
 
@@ -217,8 +234,14 @@ final class ScreeningController
 
     public static function assignEvaluator(): void
     {
+        if (!Gate::hasRole('college_coordinator')) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
+        }
         Gate::authorize('research.assign');
         Csrf::verifyRequest();
+
         $id = (int) ($_POST['id'] ?? 0);
         $app = ApplicationModel::find($id);
         if ($app === null) {
@@ -226,14 +249,44 @@ final class ScreeningController
             redirect('index.php?action=applications');
         }
         self::assertCollegeScope($app, 'index.php?action=application_view&id=' . $id);
-        $evaluatorIds = array_map('intval', (array) ($_POST['evaluator_ids'] ?? []));
+        if (!in_array((string) ($app['status_code'] ?? ''), ['EVALUATOR_ASSIGNMENT_PENDING', 'EVALUATOR_ASSIGNED', 'UNDER_EVALUATION'], true)) {
+            Session::flash('error', 'College evaluators can only be assigned while college evaluation is pending or in progress.');
+            redirect('index.php?action=application_view&id=' . $id);
+        }
+
+        $evaluatorIds = array_values(array_unique(array_filter(
+            array_map('intval', (array) ($_POST['evaluator_ids'] ?? [])),
+            static fn(int $uid): bool => $uid > 0
+        )));
         if (!$evaluatorIds) {
             Session::flash('error', 'Select at least one evaluator.');
             redirect('index.php?action=assign_evaluators&id=' . $id);
         }
-        $deadline = $_POST['deadline'] ?: null;
+        $deadline = trim((string) ($_POST['deadline'] ?? '')) ?: null;
+        $required = max(1, (int) (Database::scalar(
+            'SELECT required_evaluators FROM research_calls WHERE id = ?',
+            [(int) $app['call_id']]
+        ) ?? Settings::int('college_evaluators_default', 1)));
 
-        // Server-side eligibility validation
+        $conflictedAssignments = Database::all(
+            'SELECT id FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "college"
+               AND is_active = 1 AND status = "conflict_declared"',
+            [$id]
+        );
+        $conflictedIds = array_map('intval', array_column($conflictedAssignments, 'id'));
+        $activeCount = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "college" AND is_active = 1
+               AND status NOT IN ("cancelled","declined","conflict_declared")',
+            [$id]
+        );
+        $needed = max(0, $required - $activeCount);
+        if (count($evaluatorIds) !== $needed) {
+            Session::flash('error', "Select exactly {$needed} replacement/new evaluator(s) to meet the required total of {$required}.");
+            redirect('index.php?action=assign_evaluators&id=' . $id);
+        }
+
         $teamMembers = Database::all(
             'SELECT user_id FROM application_team_members WHERE application_id = ? AND status <> "declined"',
             [$id]
@@ -241,69 +294,91 @@ final class ScreeningController
         $teamIds = array_map('intval', array_column($teamMembers, 'user_id'));
         $teamIds[] = (int) $app['pi_user_id'];
 
-        $assigned = 0;
         $rejected = [];
-
         foreach ($evaluatorIds as $uid) {
-            // Check 1: Must be from same college
-            $evaluatorCollege = Database::scalar('SELECT college_id FROM users WHERE id = ?', [$uid]);
-            if ((int) $evaluatorCollege !== (int) $app['college_id']) {
-                $rejected[] = "Evaluator $uid is not from the same college";
+            $eligible = (int) Database::scalar(
+                'SELECT COUNT(*) FROM users u
+                 JOIN user_roles ur ON ur.user_id = u.id
+                 JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
+                 JOIN research_evaluators re ON re.user_id = u.id
+                 WHERE u.id = ? AND u.status = "active"
+                   AND u.college_id = ? AND re.availability_status = "available"',
+                [$uid, (int) $app['college_id']]
+            );
+            if ($eligible !== 1) {
+                $rejected[] = "Evaluator {$uid} must have an active evaluator role/profile in this college.";
                 continue;
             }
-
-            // Check 2: Cannot be PI or co-investigator
             if (in_array($uid, $teamIds, true)) {
-                $rejected[] = "Evaluator $uid is a member of the research team";
+                $rejected[] = "Evaluator {$uid} is a member of the research team.";
                 continue;
             }
-
-            // Check 3: Cannot already be assigned
-            $existing = Database::scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1',
+            $alreadyAssigned = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND evaluator_user_id = ?
+                   AND assignment_level = "college" AND is_active = 1
+                   AND status NOT IN ("cancelled","declined","conflict_declared")',
                 [$id, $uid]
             );
-            if ((int) $existing > 0) {
-                $rejected[] = "Evaluator $uid is already assigned";
+            if ($alreadyAssigned > 0) {
+                $rejected[] = "Evaluator {$uid} is already assigned at college level.";
                 continue;
             }
-
-            // Check 4: Account must be active
-            $evaluatorStatus = Database::scalar('SELECT status FROM users WHERE id = ?', [$uid]);
-            if ($evaluatorStatus !== 'active') {
-                $rejected[] = "Evaluator $uid account is not active";
+            $conflict = EvaluationModel::detectConflicts($id, $uid);
+            if ($conflict !== null) {
+                $rejected[] = "Evaluator {$uid} has a potential conflict: {$conflict}.";
                 continue;
             }
-
-            // Check 5: Max concurrent evaluations
             $currentLoad = EvaluationModel::workloadFor($uid);
-            $maxLoad = (int) Database::scalar('SELECT max_concurrent_evaluations FROM research_evaluators WHERE user_id = ?', [$uid]);
+            $maxLoad = (int) Database::scalar(
+                'SELECT max_concurrent_evaluations FROM research_evaluators WHERE user_id = ?',
+                [$uid]
+            );
             if ($maxLoad > 0 && $currentLoad >= $maxLoad) {
-                $rejected[] = "Evaluator $uid is at maximum capacity";
-                continue;
+                $rejected[] = "Evaluator {$uid} is at maximum capacity.";
             }
-
-            // All checks passed - assign
-            EvaluationModel::assign($id, $uid, Auth::id(), $deadline);
-            NotificationService::notifyEvaluatorAssigned($uid, $id, (string) $app['title']);
-            Audit::log('evaluator.assigned', 'research_application', $id, null, ['evaluator' => $uid]);
-            $assigned++;
         }
-
         if ($rejected) {
-            Session::flash('warning', "$assigned evaluator(s) assigned. " . count($rejected) . " skipped: " . implode('; ', $rejected));
-        } else {
-            Session::flash('success', $assigned . ' evaluator(s) assigned and notified.');
+            Session::flash('error', implode(' ', $rejected));
+            redirect('index.php?action=assign_evaluators&id=' . $id);
         }
 
-        $app = ApplicationModel::find($id);
-        if (in_array($app['status_code'], ['EVALUATOR_ASSIGNMENT_PENDING'], true)) {
-            WorkflowService::fire($app, 'research_application', 'Assign evaluators', null);
+        try {
+            Database::transaction(function () use ($id, $evaluatorIds, $conflictedIds, $deadline, $app): void {
+                foreach ($conflictedIds as $assignmentId) {
+                    Database::update('evaluator_assignments', [
+                        'is_active' => 0,
+                        'status' => 'cancelled',
+                    ], 'id = ?', [$assignmentId]);
+                    Database::update('evaluator_conflicts', [
+                        'resolved' => 'resolved_reassigned',
+                        'resolved_by' => Auth::id(),
+                        'resolved_at' => date('Y-m-d H:i:s'),
+                    ], 'assignment_id = ? AND resolved = "open"', [$assignmentId]);
+                }
+                foreach ($evaluatorIds as $uid) {
+                    EvaluationModel::assign($id, $uid, Auth::id(), $deadline, 'college');
+                }
+                if (($app['status_code'] ?? '') === 'EVALUATOR_ASSIGNMENT_PENDING') {
+                    [$ok, $error] = WorkflowService::fire($app, 'research_application', 'Assign evaluators', null);
+                    if (!$ok) {
+                        throw new \\RuntimeException($error ?? 'Could not advance the college evaluation workflow.');
+                    }
+                }
+            });
+        } catch (\\Throwable $e) {
+            Session::flash('error', $e->getMessage());
+            redirect('index.php?action=application_view&id=' . $id);
         }
+
+        foreach ($evaluatorIds as $uid) {
+            NotificationService::notifyEvaluatorAssigned($uid, $id, (string) $app['title']);
+            Audit::log('evaluator.assigned', 'research_application', $id, null, ['evaluator' => $uid, 'stage' => 'college']);
+        }
+        Session::flash('success', count($evaluatorIds) . ' college evaluator(s) assigned and notified.');
         redirect('index.php?action=application_view&id=' . $id);
     }
 
-    /** Evaluator accept / decline / conflict declaration (§21). */
     public static function evaluatorRespond(): void
     {
         Gate::authorize('research.evaluate');

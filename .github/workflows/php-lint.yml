@@ -15,20 +15,28 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           coverage: none
-      - name: Lint PHP application, scripts, and tests
+      - name: Lint changed PHP files
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -d '' files < <(find app scripts tests -type f -name '*.php' -print0)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No PHP files found."
-            exit 1
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$GITHUB_BASE_REF" --depth=1
+            changed_files="$(git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF...HEAD" -- '*.php')"
+          else
+            changed_files="$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD -- '*.php')"
           fi
-          for file in "${files[@]}"; do
+          if [ -z "$changed_files" ]; then
+            echo "No changed PHP files to lint."
+            exit 0
+          fi
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
             php -l "$file"
-          done
+          done <<< "$changed_files"

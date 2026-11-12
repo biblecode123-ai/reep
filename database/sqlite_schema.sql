@@ -706,6 +706,7 @@ CREATE TABLE university_budget_recommendations (
     application_id INTEGER NOT NULL,
     evaluator_id INTEGER NOT NULL,
     amount NUMERIC NOT NULL,
+    justification TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (application_id) REFERENCES research_applications(id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE

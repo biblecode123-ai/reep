@@ -40,6 +40,11 @@ DROP TABLE IF EXISTS ethics_reviews;
 DROP TABLE IF EXISTS ethics_applications;
 DROP TABLE IF EXISTS project_actions;
 DROP TABLE IF EXISTS research_extension_requests;
+DROP TABLE IF EXISTS project_evaluation_indicator_scores;
+DROP TABLE IF EXISTS project_final_report_decisions;
+DROP TABLE IF EXISTS project_evaluations;
+DROP TABLE IF EXISTS project_evaluator_assignments;
+DROP TABLE IF EXISTS project_final_reports;
 DROP TABLE IF EXISTS progress_reports;
 DROP TABLE IF EXISTS research_milestones;
 DROP TABLE IF EXISTS funding_releases;
@@ -50,9 +55,13 @@ DROP TABLE IF EXISTS university_decisions;
 DROP TABLE IF EXISTS college_decisions;
 DROP TABLE IF EXISTS revision_responses;
 DROP TABLE IF EXISTS revision_requests;
+DROP TABLE IF EXISTS rubric_indicator_scores;
 DROP TABLE IF EXISTS evaluation_comments;
 DROP TABLE IF EXISTS evaluation_scores;
 DROP TABLE IF EXISTS evaluations;
+DROP TABLE IF EXISTS rubric_indicators;
+DROP TABLE IF EXISTS rubric_criteria;
+DROP TABLE IF EXISTS rubric_templates;
 DROP TABLE IF EXISTS evaluation_criteria;
 DROP TABLE IF EXISTS evaluator_conflicts;
 DROP TABLE IF EXISTS evaluator_assignments;
@@ -470,6 +479,48 @@ CREATE TABLE evaluation_criteria (
 -- SECTION D — RESEARCH APPLICATIONS (spec §16–§27)
 -- =============================================================================
 
+-- Four independent, versioned 100-point institutional evaluation rubrics.
+CREATE TABLE rubric_templates (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    rubric_type ENUM('college_proposal','college_completed_report','university_proposal','university_completed_report') NOT NULL,
+    name        VARCHAR(180) NOT NULL,
+    version     INT NOT NULL,
+    is_active   TINYINT(1) NOT NULL DEFAULT 0,
+    created_by  BIGINT UNSIGNED NULL,
+    approved_by BIGINT UNSIGNED NULL,
+    approved_at DATETIME NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_rubric_version (rubric_type, version),
+    KEY idx_rubric_active (rubric_type, is_active),
+    CONSTRAINT fk_rubric_created FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_rubric_approved FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rubric_criteria (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    template_id BIGINT UNSIGNED NOT NULL,
+    name        VARCHAR(180) NOT NULL,
+    max_points  DECIMAL(6,2) NOT NULL,
+    sort_order  INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_rubric_criterion_name (template_id, name),
+    CONSTRAINT fk_rubric_criterion_template FOREIGN KEY (template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rubric_indicators (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    criterion_id BIGINT UNSIGNED NOT NULL,
+    name         VARCHAR(220) NOT NULL,
+    description  TEXT NULL,
+    max_points   DECIMAL(6,2) NOT NULL,
+    is_required  TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order   INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_rubric_indicator_name (criterion_id, name),
+    CONSTRAINT fk_rubric_indicator_criterion FOREIGN KEY (criterion_id) REFERENCES rubric_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE research_applications (
     id                       BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_number       VARCHAR(40) NOT NULL,          -- MWU-RPEE-APP-YYYY-NNNN
@@ -544,6 +595,22 @@ CREATE TABLE research_applications (
     CONSTRAINT fk_app_wf    FOREIGN KEY (workflow_id)     REFERENCES workflows (id)        ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Proposal-stage collaborators; copied into project membership on activation.
+CREATE TABLE application_team_members (
+    id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    application_id BIGINT UNSIGNED NOT NULL,
+    user_id        BIGINT UNSIGNED NOT NULL,
+    role           ENUM('PI','co_investigator') NOT NULL DEFAULT 'co_investigator',
+    status         ENUM('pending','accepted','declined') NOT NULL DEFAULT 'pending',
+    invited_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at   DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_app_team_member (application_id, user_id),
+    KEY idx_app_team_user (user_id, status),
+    CONSTRAINT fk_app_team_app FOREIGN KEY (application_id) REFERENCES research_applications (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_app_team_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE research_work_plan_items (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_id  BIGINT UNSIGNED NOT NULL,
@@ -593,7 +660,7 @@ CREATE TABLE evaluator_assignments (
     reminder_sent_at  DATETIME NULL,
     is_active         TINYINT(1) NOT NULL DEFAULT 1,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_evalassign (application_id, evaluator_user_id),
+    UNIQUE KEY uq_evalassign_stage (application_id, evaluator_user_id, assignment_level),
     KEY idx_evalassign_evaluator (evaluator_user_id, status),
     CONSTRAINT fk_ea_app FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ea_usr FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -621,6 +688,8 @@ CREATE TABLE evaluations (
     id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_id    BIGINT UNSIGNED NOT NULL,
     assignment_id     BIGINT UNSIGNED NULL,
+    rubric_template_id BIGINT UNSIGNED NULL,
+    rubric_snapshot   JSON NULL,
     evaluator_user_id BIGINT UNSIGNED NOT NULL,
     evaluation_type   ENUM('proposal','final') NOT NULL DEFAULT 'proposal',
     evaluation_round  INT NOT NULL DEFAULT 1, -- increments on re-evaluation (§25)
@@ -643,6 +712,7 @@ CREATE TABLE evaluations (
     UNIQUE KEY uq_eval_assignment_round (assignment_id, evaluation_round),
     CONSTRAINT fk_ev_app   FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ev_asg   FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_ev_rubric FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ev_usr   FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ev_amend FOREIGN KEY (amended_from_id)   REFERENCES evaluations (id)           ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -657,6 +727,20 @@ CREATE TABLE evaluation_scores (
     UNIQUE KEY uq_escore (evaluation_id, criterion_id),
     CONSTRAINT fk_es_eval FOREIGN KEY (evaluation_id) REFERENCES evaluations (id)            ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_es_crit FOREIGN KEY (criterion_id)  REFERENCES research_call_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rubric_indicator_scores (
+    id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    evaluation_id  BIGINT UNSIGNED NOT NULL,
+    indicator_id   BIGINT UNSIGNED NOT NULL,
+    score          DECIMAL(6,2) NOT NULL,
+    comment        VARCHAR(1000) NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_rubric_indicator_score (evaluation_id, indicator_id),
+    CONSTRAINT fk_rubric_score_eval FOREIGN KEY (evaluation_id) REFERENCES evaluations (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_rubric_score_indicator FOREIGN KEY (indicator_id) REFERENCES rubric_indicators (id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE evaluation_comments (
@@ -730,6 +814,7 @@ CREATE TABLE university_budget_recommendations (
     application_id BIGINT UNSIGNED NOT NULL,
     evaluator_id BIGINT UNSIGNED NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
+    justification TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_ubr_app FOREIGN KEY (application_id) REFERENCES research_applications(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -994,12 +1079,115 @@ CREATE TABLE progress_reports (
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_preport_number (report_number),
+    UNIQUE KEY uq_progress_project_period (project_id, reporting_period),
     KEY idx_preport_proj (project_id, status),
     CONSTRAINT fk_preport_proj FOREIGN KEY (project_id) REFERENCES research_projects (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_preport_rev  FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Extension of project deadline (spec §43) — distinct from the Extension module.
+-- Final completed-research-report evaluation lifecycle.
+CREATE TABLE project_final_reports (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    project_id BIGINT UNSIGNED NOT NULL,
+    document_id BIGINT UNSIGNED NOT NULL,
+    version INT NOT NULL,
+    status ENUM('submitted_to_college','college_evaluation','college_revision_required','college_passed','university_evaluation','university_revision_required','university_passed','approved','rejected') NOT NULL DEFAULT 'submitted_to_college',
+    submitted_by BIGINT UNSIGNED NOT NULL,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    college_average_score DECIMAL(6,2) NULL,
+    university_average_score DECIMAL(6,2) NULL,
+    director_decision VARCHAR(40) NULL,
+    director_comments TEXT NULL,
+    director_user_id BIGINT UNSIGNED NULL,
+    director_decided_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_final_report_version (project_id, version),
+    KEY idx_final_report_status (status, project_id),
+    CONSTRAINT fk_final_report_project FOREIGN KEY (project_id) REFERENCES research_projects (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_final_report_document FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_final_report_submitter FOREIGN KEY (submitted_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_final_report_director FOREIGN KEY (director_user_id) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_evaluator_assignments (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    final_report_id BIGINT UNSIGNED NOT NULL,
+    evaluator_user_id BIGINT UNSIGNED NOT NULL,
+    assignment_level ENUM('college','university') NOT NULL,
+    assigned_by BIGINT UNSIGNED NOT NULL,
+    assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deadline DATETIME NULL,
+    status ENUM('assigned','accepted','declined','conflict_declared','completed','cancelled') NOT NULL DEFAULT 'assigned',
+    response_reason TEXT NULL,
+    responded_at DATETIME NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_project_eval_assignment (final_report_id, evaluator_user_id, assignment_level),
+    KEY idx_project_eval_assignment_user (evaluator_user_id, assignment_level, status),
+    CONSTRAINT fk_project_eval_asg_report FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_asg_user FOREIGN KEY (evaluator_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_asg_by FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_evaluations (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    final_report_id BIGINT UNSIGNED NOT NULL,
+    assignment_id BIGINT UNSIGNED NOT NULL,
+    evaluator_user_id BIGINT UNSIGNED NOT NULL,
+    rubric_template_id BIGINT UNSIGNED NOT NULL,
+    rubric_snapshot JSON NOT NULL,
+    evaluation_round INT NOT NULL DEFAULT 1,
+    weighted_score DECIMAL(6,2) NOT NULL DEFAULT 0,
+    max_score DECIMAL(6,2) NOT NULL DEFAULT 100,
+    recommendation ENUM('accept','accept_with_revision','major_revision','reject') NULL,
+    strengths TEXT NULL,
+    weaknesses TEXT NULL,
+    recommendations TEXT NULL,
+    overall_comment TEXT NULL,
+    status ENUM('draft','submitted','returned') NOT NULL DEFAULT 'draft',
+    submitted_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_project_eval_assignment_round (assignment_id, evaluation_round),
+    KEY idx_project_eval_report (final_report_id, status),
+    CONSTRAINT fk_project_eval_report FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_assignment FOREIGN KEY (assignment_id) REFERENCES project_evaluator_assignments (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_user FOREIGN KEY (evaluator_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_rubric FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_evaluation_indicator_scores (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    project_evaluation_id BIGINT UNSIGNED NOT NULL,
+    indicator_id BIGINT UNSIGNED NOT NULL,
+    score DECIMAL(6,2) NOT NULL,
+    comment VARCHAR(1000) NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_project_eval_indicator_score (project_evaluation_id, indicator_id),
+    CONSTRAINT fk_project_eval_score_eval FOREIGN KEY (project_evaluation_id) REFERENCES project_evaluations (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_project_eval_score_indicator FOREIGN KEY (indicator_id) REFERENCES rubric_indicators (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE project_final_report_decisions (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    final_report_id BIGINT UNSIGNED NOT NULL,
+    stage ENUM('college','university','directorate') NOT NULL,
+    decision ENUM('forward_to_university','revision_required','reject','approve') NOT NULL,
+    comments TEXT NULL,
+    decided_by BIGINT UNSIGNED NOT NULL,
+    decided_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_final_decision_report (final_report_id, stage, decided_at),
+    CONSTRAINT fk_final_decision_report FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_final_decision_user FOREIGN KEY (decided_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE research_extension_requests (
     id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     project_id         BIGINT UNSIGNED NOT NULL,

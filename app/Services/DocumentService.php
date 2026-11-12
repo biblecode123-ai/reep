@@ -177,9 +177,6 @@ final class DocumentService
         if (!Auth::check()) {
             return false;
         }
-        if (Gate::isAdmin()) {
-            return true;
-        }
         if (Gate::denies('document.view')) {
             return false;
         }
@@ -323,6 +320,31 @@ final class DocumentService
                     (int) $committeeAssignment['committee_id'],
                     (int) Auth::id()
                 );
+        }
+
+        if ($doc['entity_type'] === 'research_project') {
+            $projectId = (int) $doc['entity_id'];
+            $assigned = (bool) Database::scalar(
+                'SELECT COUNT(*) FROM project_evaluator_assignments pea
+                 JOIN project_final_reports pfr ON pfr.id = pea.final_report_id
+                 WHERE pfr.project_id = ? AND pea.evaluator_user_id = ? AND pea.is_active = 1
+                   AND pea.status NOT IN ("conflict_declared", "declined", "cancelled")',
+                [$projectId, Auth::id()]
+            );
+            if ($assigned) {
+                return true;
+            }
+
+            $college = Database::scalar('SELECT college_id FROM research_projects WHERE id = ?', [$projectId]);
+            $user = Auth::user();
+            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+            if ($isCoordinator && Gate::allows('research.screen') && $college !== null
+                && $user !== null && (int) ($user['college_id'] ?? 0) === (int) $college) {
+                return true;
+            }
+
+            return (Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer'))
+                && Gate::allows('research.manage', 'research.review');
         }
 
         if ($doc['entity_type'] === 'research_dataset') {

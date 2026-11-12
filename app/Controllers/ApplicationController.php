@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DeadlineHelper;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
@@ -67,6 +68,11 @@ final class ApplicationController
             }
         }
         $openCalls = CallModel::openCalls();
+        $selectedCallId = $app !== null ? (int) $app['call_id'] : $callId;
+        $call = $selectedCallId > 0 ? CallModel::find($selectedCallId) : null;
+        if ($call !== null && !in_array((int) $call['id'], array_map(static fn(array $row): int => (int) $row['id'], $openCalls), true)) {
+            $openCalls[] = $call;
+        }
         $themes = \App\Models\OrgModel::themes();
         $types = \App\Models\OrgModel::types();
         $workPlan = $id ? ApplicationModel::workPlan($id) : [];
@@ -91,7 +97,7 @@ final class ApplicationController
         [$ok, $errors, $clean] = Validator::check($_POST, [
             'title'       => 'required|max:250',
             'call_id'     => 'required|integer',
-            'budget'      => 'numeric',
+            'budget'      => 'required|numeric',
             'requires_ethics' => 'in:yes,no,unsure',
         ]);
         if (!$ok) {
@@ -100,8 +106,11 @@ final class ApplicationController
         }
 
         $call = CallModel::find((int) $clean['call_id']);
-        if ($call === null || !\App\Core\DeadlineHelper::isCallOpen($call)) {
-            Session::flash('error', 'The selected call is not currently open for applications.');
+        if ($call === null
+            || !in_array((string) ($call['status'] ?? ''), ['published', 'open'], true)
+            || !DeadlineHelper::hasValidWindow($call)
+            || DeadlineHelper::hasCallClosed($call)) {
+            Session::flash('error', 'The selected research call is not accepting draft applications.');
             redirect('index.php?action=calls_public');
         }
         if ($id === 0) {
@@ -125,26 +134,70 @@ final class ApplicationController
             Session::flash('error', 'Your account has no college assigned. Contact the administrator.');
             redirect('index.php');
         }
-        $data = [
-            'call_id'         => (int) $call['id'],
-            'title'           => $clean['title'],
-            'college_id'      => $collegeId,
-            'department_id'   => ((int) $user['department_id']) ?: null,
-            'abstract'        => null,
-            'background'      => null,
-            'problem_statement' => null,
-            'objectives'      => null,
-            'research_questions' => null,
-            'literature_review' => null,
-            'methodology'     => null,
-            'expected_results' => null,
-            'significance'    => null,
-            'innovation'      => null,
-            'references_text' => null,
-            'budget_requested' => (float) ($clean['budget'] ?? 0),
-            'budget_justification' => trim((string) ($_POST['budget_justification'] ?? '')) ?: null,
-            'requires_ethics' => $clean['requires_ethics'],
+        $structuredFields = [
+            'research_area', 'abstract', 'background', 'problem_statement', 'objectives',
+            'research_questions', 'literature_review', 'methodology', 'expected_results',
+            'significance', 'innovation', 'references_text',
         ];
+        $data = [
+            'call_id'             => (int) $call['id'],
+            'title'               => $clean['title'],
+            'research_type_id'    => ((int) ($_POST['research_type_id'] ?? 0)) ?: null,
+            'research_theme_id'   => ((int) ($_POST['research_theme_id'] ?? 0)) ?: null,
+            'research_area'       => trim((string) ($_POST['research_area'] ?? '')) ?: null,
+            'college_id'          => $collegeId,
+            'department_id'       => ((int) $user['department_id']) ?: null,
+            'duration_months'     => ((int) ($_POST['duration_months'] ?? 0)) ?: null,
+            'proposed_start_date' => trim((string) ($_POST['proposed_start_date'] ?? '')) ?: null,
+            'proposed_end_date'   => trim((string) ($_POST['proposed_end_date'] ?? '')) ?: null,
+            'budget_requested'   => (float) ($clean['budget'] ?? 0),
+            'budget_justification' => trim((string) ($_POST['budget_justification'] ?? '')) ?: null,
+            'requires_ethics'     => $clean['requires_ethics'],
+        ];
+        foreach ($structuredFields as $field) {
+            $data[$field] = trim((string) ($_POST[$field] ?? '')) ?: null;
+        }
+
+        $researchTypeId = (int) ($data['research_type_id'] ?? 0);
+        if ($researchTypeId > 0 && (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_types WHERE id = ? AND is_active = 1',
+            [$researchTypeId]
+        ) !== 1) {
+            Session::flash('error', 'Select a valid active research type.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        $researchThemeId = (int) ($data['research_theme_id'] ?? 0);
+        if ($researchThemeId > 0 && (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_themes WHERE id = ? AND is_active = 1',
+            [$researchThemeId]
+        ) !== 1) {
+            Session::flash('error', 'Select a valid active research theme.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        if ($data['duration_months'] !== null && ((int) $data['duration_months'] < 1
+            || (!empty($call['max_duration_months']) && (int) $data['duration_months'] > (int) $call['max_duration_months']))) {
+            Session::flash('error', 'The proposed duration is outside the permitted call duration.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        foreach (['proposed_start_date', 'proposed_end_date'] as $dateField) {
+            if ($data[$dateField] !== null) {
+                $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $data[$dateField]);
+                if (!$date || $date->format('Y-m-d') !== $data[$dateField]) {
+                    Session::flash('error', 'Enter valid proposed start and end dates.');
+                    redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+                }
+            }
+        }
+        if ($data['proposed_start_date'] && $data['proposed_end_date']
+            && $data['proposed_end_date'] < $data['proposed_start_date']) {
+            Session::flash('error', 'The proposed end date must be after the proposed start date.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        if ((float) $data['budget_requested'] < 0
+            || (!empty($call['max_budget']) && (float) $data['budget_requested'] > (float) $call['max_budget'])) {
+            Session::flash('error', 'Requested budget is outside the permitted call budget.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
 
         try {
             if ($id > 0) {
@@ -201,12 +254,22 @@ final class ApplicationController
             if (trim((string) $act) === '') {
                 continue;
             }
+            $startRaw = trim((string) ($_POST['wp_start'][$i] ?? ''));
+            $endRaw = trim((string) ($_POST['wp_end'][$i] ?? ''));
+            $startDate = $startRaw !== '' ? \DateTimeImmutable::createFromFormat('!Y-m-d', $startRaw) : null;
+            $endDate = $endRaw !== '' ? \DateTimeImmutable::createFromFormat('!Y-m-d', $endRaw) : null;
+            if (($startRaw !== '' && (!$startDate || $startDate->format('Y-m-d') !== $startRaw))
+                || ($endRaw !== '' && (!$endDate || $endDate->format('Y-m-d') !== $endRaw))
+                || ($startRaw !== '' && $endRaw !== '' && $endRaw < $startRaw)) {
+                Session::flash('error', 'Each work-plan activity must have valid dates, and its end date cannot precede its start date.');
+                redirect('index.php?action=application_form&id=' . $id);
+            }
             $items[] = [
-                'activity'        => (string) $act,
-                'start_date'      => $_POST['wp_start'][$i] ?? null,
-                'end_date'        => $_POST['wp_end'][$i] ?? null,
-                'responsible'     => $_POST['wp_resp'][$i] ?? null,
-                'expected_output' => $_POST['wp_out'][$i] ?? null,
+                'activity'        => trim((string) $act),
+                'start_date'      => $startRaw !== '' ? $startRaw : null,
+                'end_date'        => $endRaw !== '' ? $endRaw : null,
+                'responsible'     => trim((string) ($_POST['wp_resp'][$i] ?? '')) ?: null,
+                'expected_output' => trim((string) ($_POST['wp_out'][$i] ?? '')) ?: null,
             ];
         }
         ApplicationModel::setWorkPlan($id, $items);
@@ -322,7 +385,56 @@ final class ApplicationController
             Session::flash('error', 'Only draft applications can be submitted.');
             redirect('index.php?action=application_view&id=' . $id);
         }
-        // documents_complete condition verified inside the workflow fire (§96).
+
+        // Enforce the official call window server-side, including for drafts
+        // created before opening or submitted after the closing instant.
+        $call = CallModel::find((int) $app['call_id']);
+        if ($call === null || !DeadlineHelper::isCallOpen($call)) {
+            Session::flash('error', 'This research call is not currently accepting submissions. Check its official opening and closing dates.');
+            redirect('index.php?action=application_view&id=' . $id);
+        }
+
+        // A proposal must have complete structured content before it can leave draft.
+        $requiredSections = [
+            'abstract' => 'Abstract',
+            'background' => 'Background',
+            'problem_statement' => 'Problem statement',
+            'objectives' => 'Research objectives',
+            'research_questions' => 'Research questions / hypotheses',
+            'literature_review' => 'Literature review',
+            'methodology' => 'Research design and methodology',
+            'expected_results' => 'Expected results',
+            'significance' => 'Significance and contribution',
+            'innovation' => 'Innovation / originality',
+            'references_text' => 'References and citations',
+        ];
+        $missing = [];
+        foreach ($requiredSections as $field => $label) {
+            if (trim((string) ($app[$field] ?? '')) === '') {
+                $missing[] = $label;
+            }
+        }
+        if (empty($app['research_type_id'])) {
+            $missing[] = 'Research type';
+        }
+        if ((float) ($app['budget_requested'] ?? 0) > 0 && trim((string) ($app['budget_justification'] ?? '')) === '') {
+            $missing[] = 'Budget justification';
+        }
+        if ($missing !== []) {
+            Session::flash('error', 'Complete these proposal sections before submission: ' . implode(', ', $missing) . '.');
+            redirect('index.php?action=application_form&id=' . $id);
+        }
+
+        $workPlanCount = (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_work_plan_items WHERE application_id = ?',
+            [$id]
+        );
+        if ($workPlanCount < 1) {
+            Session::flash('error', 'Add at least one work-plan activity before submitting the proposal.');
+            redirect('index.php?action=application_form&id=' . $id);
+        }
+
+        // documents_complete condition is also verified inside the workflow fire (§96).
         [$ok, $err] = WorkflowService::fire($app, 'research_application', 'Submit application', null);
         if (!$ok) {
             Session::flash('error', $err);

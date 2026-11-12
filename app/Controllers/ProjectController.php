@@ -12,6 +12,7 @@ use App\Core\Session;
 use App\Models\ApplicationModel;
 use App\Models\EthicsModel;
 use App\Models\ProjectModel;
+use App\Models\FinalReportModel;
 use App\Services\NotificationService;
 use App\Services\NumberingService;
 use App\Services\WorkflowService;
@@ -118,6 +119,25 @@ final class ProjectController
                 'joined_at'   => date('Y-m-d'),
                 'status'      => 'active',
             ]);
+
+            // Preserve the accepted proposal team when the approved application
+            // becomes a project. Pending or declined invitations are not members.
+            $acceptedTeam = Database::all(
+                'SELECT user_id, role FROM application_team_members
+                 WHERE application_id = ? AND status = "accepted" AND user_id <> ?',
+                [(int) $app['id'], (int) $app['pi_user_id']]
+            );
+            foreach ($acceptedTeam as $member) {
+                ProjectModel::addMember([
+                    'project_id'   => $projectId,
+                    'user_id'      => (int) $member['user_id'],
+                    'member_role'  => $member['role'] === 'co_investigator' ? 'co_investigator' : 'other',
+                    'joined_at'    => date('Y-m-d'),
+                    'status'       => 'active',
+                    'approved_by'  => Auth::id(),
+                ]);
+            }
+
             // Default milestones from the work plan (§40).
             foreach (\App\Models\ApplicationModel::workPlan((int) $app['id']) as $i => $wp) {
                 ProjectModel::addMilestone([
@@ -186,6 +206,13 @@ final class ProjectController
         $members = ProjectModel::members($id);
         $milestones = ProjectModel::milestones($id);
         $reports = ProjectModel::reports($id);
+        $latestFinalReport = FinalReportModel::latestForProject($id);
+        $finalReport = $latestFinalReport !== null
+            ? FinalReportModel::find((int) $latestFinalReport['id'])
+            : null;
+        $canSubmitFinalReport = $isPi
+            && in_array((string) $project['status_code'], ['ACTIVE','PROGRESS_MONITORING'], true)
+            && ($finalReport === null || in_array($finalReport['status'], ['college_revision_required','university_revision_required'], true));
         $budget = ProjectModel::budget($id);
         $budgetItems = $budget ? ProjectModel::budgetItems((int) $budget['id']) : [];
         $releases = ProjectModel::fundingReleases($id);
@@ -257,13 +284,50 @@ final class ProjectController
             Session::flash('error', 'Not authorized to report on this project.');
             redirect('index.php?action=projects');
         }
-        $progress = is_numeric($_POST['progress_pct'] ?? null) ? min(100, max(0, (float) $_POST['progress_pct'])) : 0;
+        if (!in_array((string) $project['status_code'], ['ACTIVE', 'PROGRESS_MONITORING'], true)) {
+            Session::flash('error', 'Reports are accepted only while the project is active and before closure.');
+            redirect('index.php?action=project_view&id=' . $projectId);
+        }
+
+        $periodStartRaw = trim((string) ($_POST['period_start'] ?? ''));
+        $periodEndRaw = trim((string) ($_POST['period_end'] ?? ''));
+        $periodStartDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodStartRaw);
+        $periodEndDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodEndRaw);
+        if (!$periodStartDate || !$periodEndDate
+            || $periodStartDate->format('Y-m-d') !== $periodStartRaw
+            || $periodEndDate->format('Y-m-d') !== $periodEndRaw
+            || $periodStartDate->format('d') !== '01'
+            || $periodEndDate->format('Y-m') !== $periodStartDate->format('Y-m')
+            || $periodEndDate->format('d') !== $periodEndDate->format('t')) {
+            Session::flash('error', 'A progress report must cover one complete calendar month (first through last day).');
+            redirect('index.php?action=project_view&id=' . $projectId . '#reports');
+        }
+        $period = $periodStartDate->format('Y-m');
+        if ($periodStartRaw > date('Y-m-d')
+            || (!empty($project['actual_start']) && $periodEndRaw < $project['actual_start'])) {
+            Session::flash('error', 'The reporting period must not be in the future or before project activation.');
+            redirect('index.php?action=project_view&id=' . $projectId . '#reports');
+        }
+        $duplicate = (int) Database::scalar(
+            'SELECT COUNT(*) FROM progress_reports WHERE project_id = ? AND reporting_period = ?',
+            [$projectId, $period]
+        );
+        if ($duplicate > 0) {
+            Session::flash('error', 'A report for ' . $period . ' has already been submitted.');
+            redirect('index.php?action=project_view&id=' . $projectId . '#reports');
+        }
+        if (!is_numeric($_POST['progress_pct'] ?? null)
+            || (float) $_POST['progress_pct'] < 0 || (float) $_POST['progress_pct'] > 100) {
+            Session::flash('error', 'Project progress must be a number between 0 and 100.');
+            redirect('index.php?action=project_view&id=' . $projectId . '#reports');
+        }
+        $progress = (float) $_POST['progress_pct'];
         $reportId = ProjectModel::createReport([
             'project_id'             => $projectId,
             'report_number'          => NumberingService::next('progress_report'),
-            'reporting_period'       => trim((string) ($_POST['reporting_period'] ?? '')) ?: null,
-            'period_start'           => ($_POST['period_start'] ?? '') ?: null,
-            'period_end'             => ($_POST['period_end'] ?? '') ?: null,
+            'reporting_period'       => $period,
+            'period_start'           => $periodStartRaw,
+            'period_end'             => $periodEndRaw,
             'progress_pct'           => $progress,
             'completed_activities'   => trim((string) ($_POST['completed_activities'] ?? '')) ?: null,
             'pending_activities'     => trim((string) ($_POST['pending_activities'] ?? '')) ?: null,

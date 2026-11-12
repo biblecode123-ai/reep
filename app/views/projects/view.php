@@ -238,32 +238,61 @@ $remaining = $budget ? (float) $budget['approved_amount'] - $released : 0;
       <?php endforeach; ?>
       <?php endif; ?>
 
-      <?php if ($canReport && in_array($project['status_code'], ['ACTIVE', 'PROGRESS_MONITORING', 'SUSPENDED'], true)): ?>
+      <?php if ($canReport && in_array($project['status_code'], ['ACTIVE', 'PROGRESS_MONITORING'], true)): ?>
       <details style="margin-top:12px;">
-        <summary style="cursor:pointer;font-weight:600;">Submit progress report</summary>
-        <form method="post" action="<?= e(url('action=project_report_submit')) ?>" enctype="multipart/form-data" style="margin-top:8px;">
+        <summary style="cursor:pointer;font-weight:600;">Submit monthly progress report</summary>
+        <form method="post" action="<?= e(url('action=monthly_report_submit')) ?>" enctype="multipart/form-data" style="margin-top:8px;">
           <?= Csrf::field() ?>
           <input type="hidden" name="project_id" value="<?= (int) $project['id'] ?>">
           <div class="form-row">
-            <div><label>Reporting period</label><input type="text" name="reporting_period" placeholder="e.g. Jan–Mar 2027"></div>
-            <div><label>Progress %</label><input type="number" name="progress_pct" min="0" max="100" required></div>
+            <div><label>Reporting month</label><input type="month" name="year_month" value="<?= e(date('Y-m')) ?>" required></div>
+            <div><label>Progress %</label><input type="number" name="progress_pct" min="0" max="100" step="0.1" required></div>
           </div>
-          <div class="form-row">
-            <div><label>Period start</label><input type="date" name="period_start"></div>
-            <div><label>Period end</label><input type="date" name="period_end"></div>
-          </div>
-          <label>Completed activities</label><textarea name="completed_activities" style="min-height:60px;"></textarea>
+          <label>Completed activities</label><textarea name="completed_activities" style="min-height:60px;" required></textarea>
           <label>Pending activities</label><textarea name="pending_activities" style="min-height:60px;"></textarea>
           <label>Challenges</label><textarea name="challenges" style="min-height:60px;"></textarea>
           <label>Achievements</label><textarea name="achievements" style="min-height:60px;"></textarea>
           <div class="form-row">
             <div><label>Financial progress %</label><input type="number" name="financial_progress_pct" min="0" max="100" step="0.1"></div>
-            <div><label>Amount spent to date</label><input type="number" name="amount_spent" step="0.01" min="0"></div>
+            <div><label>Amount spent to date</label><input type="number" name="amount_spent_to_date" step="0.01" min="0"></div>
           </div>
-          <label>Supporting document (optional)</label><input type="file" name="report_document">
-          <button class="btn" type="submit">Submit report</button>
+          <button class="btn" type="submit">Submit monthly report</button>
         </form>
       </details>
+      <?php endif; ?>
+    </div>
+
+    <!-- Completed research report evaluation -->
+    <div class="card" id="final-report">
+      <h2 class="mt0">Completed Research Report</h2>
+      <?php if ($finalReport !== null): ?>
+        <p>
+          <strong>Version <?= (int) $finalReport['version'] ?></strong>
+          <span class="badge <?= in_array($finalReport['status'], ['approved','college_passed','university_passed'], true) ? 'badge-success' : ($finalReport['status'] === 'rejected' ? 'badge-danger' : 'badge-warning') ?>">
+            <?= e(str_replace('_', ' ', $finalReport['status'])) ?>
+          </span>
+        </p>
+        <p class="muted">Submitted <?= e(format_datetime($finalReport['submitted_at'])) ?>
+          <?php if ($finalReport['college_average_score'] !== null): ?> · College average <?= e(number_format((float) $finalReport['college_average_score'], 2)) ?>/100<?php endif; ?>
+          <?php if ($finalReport['university_average_score'] !== null): ?> · University average <?= e(number_format((float) $finalReport['university_average_score'], 2)) ?>/100<?php endif; ?>
+        </p>
+        <a class="btn btn-outline btn-sm" href="<?= e(url('action=final_report_view&id=' . (int) $finalReport['id'])) ?>">View report evaluation and decisions</a>
+      <?php else: ?>
+        <p class="muted">No completed research report has been submitted for this project.</p>
+      <?php endif; ?>
+
+      <?php if ($canSubmitFinalReport): ?>
+        <details style="margin-top:12px;" <?= $finalReport === null ? 'open' : '' ?>>
+          <summary style="cursor:pointer;font-weight:600;"><?= $finalReport === null ? 'Submit completed research report' : 'Submit revised completed research report' ?></summary>
+          <form method="post" action="<?= e(url('action=final_report_submit')) ?>" enctype="multipart/form-data" style="margin-top:8px;">
+            <?= Csrf::field() ?>
+            <input type="hidden" name="project_id" value="<?= (int) $project['id'] ?>">
+            <label>Completed research report (PDF or DOCX)</label>
+            <input type="file" name="final_report" accept=".pdf,.docx" required>
+            <p class="muted">The report will first go through independent College Completed Research Report evaluation. A passing report is forwarded to the University Research Directorate.</p>
+            <button class="btn btn-primary" type="submit"><?= $finalReport === null ? 'Submit final report' : 'Submit revised version' ?></button>
+          </form>
+        </details>
       <?php endif; ?>
     </div>
 

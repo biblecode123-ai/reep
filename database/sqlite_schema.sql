@@ -33,6 +33,11 @@ DROP TABLE IF EXISTS ethics_reviews;
 DROP TABLE IF EXISTS ethics_applications;
 DROP TABLE IF EXISTS project_actions;
 DROP TABLE IF EXISTS research_extension_requests;
+DROP TABLE IF EXISTS project_evaluation_indicator_scores;
+DROP TABLE IF EXISTS project_final_report_decisions;
+DROP TABLE IF EXISTS project_evaluations;
+DROP TABLE IF EXISTS project_evaluator_assignments;
+DROP TABLE IF EXISTS project_final_reports;
 DROP TABLE IF EXISTS progress_reports;
 DROP TABLE IF EXISTS research_milestones;
 DROP TABLE IF EXISTS funding_releases;
@@ -43,9 +48,13 @@ DROP TABLE IF EXISTS university_decisions;
 DROP TABLE IF EXISTS college_decisions;
 DROP TABLE IF EXISTS revision_responses;
 DROP TABLE IF EXISTS revision_requests;
+DROP TABLE IF EXISTS rubric_indicator_scores;
 DROP TABLE IF EXISTS evaluation_comments;
 DROP TABLE IF EXISTS evaluation_scores;
 DROP TABLE IF EXISTS evaluations;
+DROP TABLE IF EXISTS rubric_indicators;
+DROP TABLE IF EXISTS rubric_criteria;
+DROP TABLE IF EXISTS rubric_templates;
 DROP TABLE IF EXISTS evaluation_criteria;
 DROP TABLE IF EXISTS evaluator_conflicts;
 DROP TABLE IF EXISTS evaluator_assignments;
@@ -408,6 +417,44 @@ CREATE TABLE evaluation_criteria (
     FOREIGN KEY (call_id) REFERENCES research_calls (id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+-- Four independent, versioned 100-point institutional evaluation rubrics.
+CREATE TABLE rubric_templates (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    rubric_type TEXT CHECK (rubric_type IN ('college_proposal','college_completed_report','university_proposal','university_completed_report')) NOT NULL,
+    name        TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    is_active   INTEGER NOT NULL DEFAULT 0,
+    created_by  INTEGER NULL,
+    approved_by INTEGER NULL,
+    approved_at DATETIME NULL,
+    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_rubric_version UNIQUE (rubric_type, version),
+    FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_criteria (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_id INTEGER NOT NULL,
+    name        TEXT NOT NULL,
+    max_points  NUMERIC NOT NULL,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_rubric_criterion_name UNIQUE (template_id, name),
+    FOREIGN KEY (template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_indicators (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    criterion_id INTEGER NOT NULL,
+    name         TEXT NOT NULL,
+    description  TEXT NULL,
+    max_points   NUMERIC NOT NULL,
+    is_required  INTEGER NOT NULL DEFAULT 1,
+    sort_order   INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT uq_rubric_indicator_name UNIQUE (criterion_id, name),
+    FOREIGN KEY (criterion_id) REFERENCES rubric_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
 CREATE TABLE research_applications (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
     application_number       TEXT NOT NULL,          -- MWU-RPEE-APP-YYYY-NNNN
@@ -476,6 +523,20 @@ CREATE TABLE research_applications (
     FOREIGN KEY (workflow_id)     REFERENCES workflows (id)        ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+-- Proposal-stage collaborators; copied into project membership on activation.
+CREATE TABLE application_team_members (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id INTEGER NOT NULL,
+    user_id        INTEGER NOT NULL,
+    role TEXT CHECK (role IN ('PI','co_investigator')) NOT NULL DEFAULT 'co_investigator',
+    status TEXT CHECK (status IN ('pending','accepted','declined')) NOT NULL DEFAULT 'pending',
+    invited_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at   DATETIME NULL,
+    CONSTRAINT uq_app_team_member UNIQUE (application_id, user_id),
+    FOREIGN KEY (application_id) REFERENCES research_applications (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE research_work_plan_items (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id  INTEGER NOT NULL,
@@ -516,7 +577,7 @@ CREATE TABLE evaluator_assignments (
     decline_reason    TEXT NULL,
     reminder_sent_at  DATETIME NULL,
     is_active         INTEGER NOT NULL DEFAULT 1,
-    CONSTRAINT uq_evalassign UNIQUE (application_id, evaluator_user_id),
+    CONSTRAINT uq_evalassign_stage UNIQUE (application_id, evaluator_user_id, assignment_level),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (assigned_by)       REFERENCES users (id)                 ON DELETE SET NULL ON UPDATE CASCADE
@@ -541,6 +602,8 @@ CREATE TABLE evaluations (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id    INTEGER NOT NULL,
     assignment_id     INTEGER NULL,
+    rubric_template_id INTEGER NULL,
+    rubric_snapshot    TEXT NULL,
     evaluator_user_id INTEGER NOT NULL,
     evaluation_type TEXT CHECK (evaluation_type IN ('proposal','final')) NOT NULL DEFAULT 'proposal',
     evaluation_round  INTEGER NOT NULL DEFAULT 1, -- increments on re-evaluation (§25)
@@ -560,6 +623,7 @@ CREATE TABLE evaluations (
     CONSTRAINT uq_eval_assignment_round UNIQUE (assignment_id, evaluation_round),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (amended_from_id)   REFERENCES evaluations (id)           ON DELETE SET NULL ON UPDATE CASCADE
 );
@@ -573,6 +637,19 @@ CREATE TABLE evaluation_scores (
     CONSTRAINT uq_escore UNIQUE (evaluation_id, criterion_id),
     FOREIGN KEY (evaluation_id) REFERENCES evaluations (id)            ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (criterion_id)  REFERENCES research_call_criteria (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE rubric_indicator_scores (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    evaluation_id  INTEGER NOT NULL,
+    indicator_id   INTEGER NOT NULL,
+    score          NUMERIC NOT NULL,
+    comment        TEXT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_rubric_indicator_score UNIQUE (evaluation_id, indicator_id),
+    FOREIGN KEY (evaluation_id) REFERENCES evaluations (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (indicator_id) REFERENCES rubric_indicators (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE evaluation_comments (
@@ -634,6 +711,7 @@ CREATE TABLE university_budget_recommendations (
     application_id INTEGER NOT NULL,
     evaluator_id INTEGER NOT NULL,
     amount NUMERIC NOT NULL,
+    justification TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (application_id) REFERENCES research_applications(id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
@@ -861,8 +939,102 @@ CREATE TABLE progress_reports (
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_preport_number UNIQUE (report_number),
+    CONSTRAINT uq_progress_project_period UNIQUE (project_id, reporting_period),
     FOREIGN KEY (project_id) REFERENCES research_projects (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- Final completed-research-report evaluation lifecycle.
+CREATE TABLE project_final_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL,
+    document_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    status TEXT CHECK (status IN ('submitted_to_college','college_evaluation','college_revision_required','college_passed','university_evaluation','university_revision_required','university_passed','approved','rejected')) NOT NULL DEFAULT 'submitted_to_college',
+    submitted_by INTEGER NOT NULL,
+    submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    college_average_score NUMERIC NULL,
+    university_average_score NUMERIC NULL,
+    director_decision TEXT NULL,
+    director_comments TEXT NULL,
+    director_user_id INTEGER NULL,
+    director_decided_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_final_report_version UNIQUE (project_id, version),
+    FOREIGN KEY (project_id) REFERENCES research_projects (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (submitted_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (director_user_id) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE project_evaluator_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    final_report_id INTEGER NOT NULL,
+    evaluator_user_id INTEGER NOT NULL,
+    assignment_level TEXT CHECK (assignment_level IN ('college','university')) NOT NULL,
+    assigned_by INTEGER NOT NULL,
+    assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deadline DATETIME NULL,
+    status TEXT CHECK (status IN ('assigned','accepted','declined','conflict_declared','completed','cancelled')) NOT NULL DEFAULT 'assigned',
+    response_reason TEXT NULL,
+    responded_at DATETIME NULL,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    CONSTRAINT uq_project_eval_assignment UNIQUE (final_report_id, evaluator_user_id, assignment_level),
+    FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (evaluator_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE project_evaluations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    final_report_id INTEGER NOT NULL,
+    assignment_id INTEGER NOT NULL,
+    evaluator_user_id INTEGER NOT NULL,
+    rubric_template_id INTEGER NOT NULL,
+    rubric_snapshot TEXT NOT NULL,
+    evaluation_round INTEGER NOT NULL DEFAULT 1,
+    weighted_score NUMERIC NOT NULL DEFAULT 0,
+    max_score NUMERIC NOT NULL DEFAULT 100,
+    recommendation TEXT CHECK (recommendation IN ('accept','accept_with_revision','major_revision','reject')) NULL,
+    strengths TEXT NULL,
+    weaknesses TEXT NULL,
+    recommendations TEXT NULL,
+    overall_comment TEXT NULL,
+    status TEXT CHECK (status IN ('draft','submitted','returned')) NOT NULL DEFAULT 'draft',
+    submitted_at DATETIME NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_project_eval_assignment_round UNIQUE (assignment_id, evaluation_round),
+    FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (assignment_id) REFERENCES project_evaluator_assignments (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (evaluator_user_id) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE project_evaluation_indicator_scores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_evaluation_id INTEGER NOT NULL,
+    indicator_id INTEGER NOT NULL,
+    score NUMERIC NOT NULL,
+    comment TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_project_eval_indicator_score UNIQUE (project_evaluation_id, indicator_id),
+    FOREIGN KEY (project_evaluation_id) REFERENCES project_evaluations (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (indicator_id) REFERENCES rubric_indicators (id) ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+CREATE TABLE project_final_report_decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    final_report_id INTEGER NOT NULL,
+    stage TEXT CHECK (stage IN ('college','university','directorate')) NOT NULL,
+    decision TEXT CHECK (decision IN ('forward_to_university','revision_required','reject','approve')) NOT NULL,
+    comments TEXT NULL,
+    decided_by INTEGER NOT NULL,
+    decided_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (final_report_id) REFERENCES project_final_reports (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (decided_by) REFERENCES users (id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE research_extension_requests (

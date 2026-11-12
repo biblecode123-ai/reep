@@ -8,7 +8,7 @@ SET NAMES utf8mb4;
 
 -- ---------------------------------------------------------------- roles 
 INSERT INTO roles (name, display_name, description, is_system) VALUES
-('system_admin',          'System Administrator',                 'Full system administration', 1),
+('system_admin',          'System Administrator',                 'Technical system administration without academic decision authority', 1),
 ('rpee_director',         'RPEE Director',                        'Head of the Research, Publication, Ethics and Extension Office', 1),
 ('rpee_officer',          'RPEE Officer',                         'RPEE staff managing calls, review, budget and reporting', 1),
 ('univ_committee',        'University Research Committee Member', 'Member of the university research committee', 1),
@@ -97,9 +97,13 @@ INSERT INTO permissions (name, module, description) VALUES
 ('integrity.manage',         'system',      'Manage research integrity cases');
 
 -- ------------------------------------------------------------ role_permissions
--- System Administrator — everything
+-- System Administrator — technical account administration only.
+-- Academic decisions, research management, policy settings, evaluator assignment,
+-- and confidential academic review remain with the designated academic roles.
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'system_admin';
+SELECT r.id, p.id FROM roles r JOIN permissions p
+  ON p.name IN ('user.view','user.manage','org.view','audit.view')
+WHERE r.name = 'system_admin';
 
 -- RPEE Director — full institutional authority
 INSERT INTO role_permissions (role_id, permission_id)
@@ -539,8 +543,16 @@ INSERT INTO system_settings (setting_key, setting_value, setting_group, value_ty
 ('escalation_after_days',      '7',                                    'notifications','integer', 'POLICY DECISION: overdue escalation period '),
 ('notification_email_enabled', '0',                                    'notifications','boolean', 'Email dispatch (disabled by default)'),
 ('repository_public_visibility','university_only',                     'repository',   'string',  'Default visibility for new repository records'),
-('evaluation_mode_default',    'single_blind',                         'research',     'string',  'Default evaluation mode '),
-('required_evaluators_default','2',                                    'research',     'integer', 'POLICY DECISION WF-2: default evaluator count'),
+('evaluation_mode_default',    'single_blind',                         'research',     'string',  'Default evaluation mode'),
+('required_evaluators_default','1',                                    'research',     'integer', 'Default college evaluator count'),
+('college_evaluators_default', '1',                                    'research',     'integer', 'Default college proposal evaluator count'),
+('university_evaluators_default','1',                                  'research',     'integer', 'Default university evaluator count'),
+('college_proposal_passing_score','50',                                 'research',     'decimal', 'College proposal passing threshold out of 100'),
+('college_report_passing_score','50',                                   'research',     'decimal', 'College completed report passing threshold out of 100'),
+('university_proposal_passing_score','50',                              'research',     'decimal', 'University proposal passing threshold out of 100'),
+('university_report_passing_score','50',                                'research',     'decimal', 'University completed report passing threshold out of 100'),
+('monthly_report_due_day',      '5',                                    'research',     'integer', 'Calendar day on which the previous monthly report becomes overdue'),
+('monthly_report_reminder_days','3',                                    'research',     'integer', 'Days before monthly report due date for reminders'),
 ('budget_currency',            'ETB',                                  'budget',       'string',  'Budget currency code'),
 ('fiscal_year_start_month',    '7',                                    'general',      'integer', 'Ethiopian fiscal year start month'),
 ('timezone',                   'Africa/Addis_Ababa',                   'general',      'string',  'Application timezone');

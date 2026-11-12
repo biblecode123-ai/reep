@@ -683,6 +683,8 @@ CREATE TABLE evaluations (
     id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     application_id    BIGINT UNSIGNED NOT NULL,
     assignment_id     BIGINT UNSIGNED NULL,
+    rubric_template_id BIGINT UNSIGNED NULL,
+    rubric_snapshot   JSON NULL,
     evaluator_user_id BIGINT UNSIGNED NOT NULL,
     evaluation_type   ENUM('proposal','final') NOT NULL DEFAULT 'proposal',
     evaluation_round  INT NOT NULL DEFAULT 1, -- increments on re-evaluation (§25)
@@ -704,7 +706,8 @@ CREATE TABLE evaluations (
     KEY idx_eval_evaluator (evaluator_user_id, status),
     UNIQUE KEY uq_eval_assignment_round (assignment_id, evaluation_round),
     CONSTRAINT fk_ev_app   FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT fk_ev_asg   FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,\n    CONSTRAINT fk_ev_rubric FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_ev_asg   FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT fk_ev_rubric FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ev_usr   FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ev_amend FOREIGN KEY (amended_from_id)   REFERENCES evaluations (id)           ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

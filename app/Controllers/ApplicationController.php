@@ -254,12 +254,22 @@ final class ApplicationController
             if (trim((string) $act) === '') {
                 continue;
             }
+            $startRaw = trim((string) ($_POST['wp_start'][$i] ?? ''));
+            $endRaw = trim((string) ($_POST['wp_end'][$i] ?? ''));
+            $startDate = $startRaw !== '' ? \DateTimeImmutable::createFromFormat('!Y-m-d', $startRaw) : null;
+            $endDate = $endRaw !== '' ? \DateTimeImmutable::createFromFormat('!Y-m-d', $endRaw) : null;
+            if (($startRaw !== '' && (!$startDate || $startDate->format('Y-m-d') !== $startRaw))
+                || ($endRaw !== '' && (!$endDate || $endDate->format('Y-m-d') !== $endRaw))
+                || ($startRaw !== '' && $endRaw !== '' && $endRaw < $startRaw)) {
+                Session::flash('error', 'Each work-plan activity must have valid dates, and its end date cannot precede its start date.');
+                redirect('index.php?action=application_form&id=' . $id);
+            }
             $items[] = [
-                'activity'        => (string) $act,
-                'start_date'      => $_POST['wp_start'][$i] ?? null,
-                'end_date'        => $_POST['wp_end'][$i] ?? null,
-                'responsible'     => $_POST['wp_resp'][$i] ?? null,
-                'expected_output' => $_POST['wp_out'][$i] ?? null,
+                'activity'        => trim((string) $act),
+                'start_date'      => $startRaw !== '' ? $startRaw : null,
+                'end_date'        => $endRaw !== '' ? $endRaw : null,
+                'responsible'     => trim((string) ($_POST['wp_resp'][$i] ?? '')) ?: null,
+                'expected_output' => trim((string) ($_POST['wp_out'][$i] ?? '')) ?: null,
             ];
         }
         ApplicationModel::setWorkPlan($id, $items);

@@ -702,6 +702,18 @@ final class ScreeningController
         $assignments = EvaluationModel::forEvaluator($userId, $filters);
         $counts = EvaluationModel::countByStatusForEvaluator($userId);
         $overdueCount = EvaluationModel::overdueCountForEvaluator($userId);
+        $projectAssignments = Database::all(
+            'SELECT pea.*, fr.version, fr.status AS report_status, p.project_number, p.title AS project_title,
+                    pi.full_name AS pi_name, c.name AS college_name
+             FROM project_evaluator_assignments pea
+             JOIN project_final_reports fr ON fr.id = pea.final_report_id
+             JOIN research_projects p ON p.id = fr.project_id
+             JOIN users pi ON pi.id = p.pi_user_id
+             LEFT JOIN colleges c ON c.id = p.college_id
+             WHERE pea.evaluator_user_id = ?
+             ORDER BY pea.assigned_at DESC',
+            [$userId]
+        );
         include APP_PATH . '/views/research/my_evaluations.php';
     }
 

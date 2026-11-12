@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 
-require __DIR__ . '/bootstrap.php';
-
 use App\Core\Database;
 use App\Core\DeadlineHelper;
 use App\Core\Settings;
 use App\Models\CallModel;
 use App\Services\ConditionEvaluator;
+
+require __DIR__ . '/bootstrap.php';
 
 $passed = 0;
 $failed = 0;
@@ -40,7 +40,7 @@ $check('closing instant is exclusive', !DeadlineHelper::isCallOpen([
     'opens_at' => $now->modify('-2 hours')->format('Y-m-d H:i:s'),
     'closes_at' => $now->format('Y-m-d H:i:s'),
 ]));
-$check('draft call cannot accept submissions', !DeadlineHelper::isCallOpen($baseCall + ['status' => 'draft']));
+$check('draft call cannot accept submissions', !DeadlineHelper::isCallOpen(array_merge($baseCall, ['status' => 'draft'])));
 $check('call with missing date boundary is rejected', !DeadlineHelper::isCallOpen(['status' => 'published', 'opens_at' => $baseCall['opens_at']]));
 $check('reversed call window is rejected', !DeadlineHelper::hasValidWindow([
     'opens_at' => $now->modify('+2 hours')->format('Y-m-d H:i:s'),

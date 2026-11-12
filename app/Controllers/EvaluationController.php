@@ -232,7 +232,7 @@ final class EvaluationController
             redirect('index.php?action=my_evaluations');
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status IN ("assigned","accepted")',
+            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status = "accepted"',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
@@ -360,17 +360,37 @@ final class EvaluationController
         // UNDER_EVALUATION until the last required evaluation lands).
         $app = ApplicationModel::find($appId);
         if (in_array($app['status_code'], ['EVALUATOR_ASSIGNED', 'EVALUATOR_ACCEPTED'], true)) {
-            WorkflowService::fire($app, 'research_application', 'Evaluator accepts', null);
-            $app = ApplicationModel::find($appId);
-            if ($app['status_code'] === 'EVALUATOR_ACCEPTED') {
-                WorkflowService::fire($app, 'research_application', 'Start evaluation', null);
+            $notAccepted = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND assignment_level = "college"
+                   AND is_active = 1 AND status IN ("assigned","conflict_declared")',
+                [$appId]
+            );
+            if ($notAccepted === 0) {
+                WorkflowService::fire($app, 'research_application', 'Evaluator accepts', null);
+                $app = ApplicationModel::find($appId);
+                if (($app['status_code'] ?? '') === 'EVALUATOR_ACCEPTED') {
+                    WorkflowService::fire($app, 'research_application', 'Start evaluation', null);
+                }
             }
         }
         $app = ApplicationModel::find($appId);
         if (in_array($app['status_code'], ['UNDER_EVALUATION', 'RE_EVALUATION'], true)) {
-            $required = (int) (Database::scalar('SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]) ?? 1);
-            $done = (int) Database::scalar('SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted"', [$appId]);
-            if ($done >= $required) {
+            $required = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND assignment_level = "college" AND is_active = 1
+                   AND status NOT IN ("cancelled","declined","conflict_declared")',
+                [$appId]
+            );
+            $done = (int) Database::scalar(
+                'SELECT COUNT(DISTINCT e.assignment_id) FROM evaluations e
+                 JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+                 WHERE e.application_id = ? AND e.status = "submitted"
+                   AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"
+                   AND ea.is_active = 1 AND ea.status = "completed"',
+                [$appId]
+            );
+            if ($required > 0 && $done >= $required) {
                 WorkflowService::fire($app, 'research_application', 'Submit evaluation', null);
             }
         }

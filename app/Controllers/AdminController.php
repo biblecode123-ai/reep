@@ -153,8 +153,8 @@ final class AdminController
         }
 
         UserModel::hardDelete($id);
-        Audit::log('user.deactivated', 'user', $id);
-        Session::flash('success', 'User deactivated and marked as inactive.');
+        Audit::log('user.deleted', 'user', $id);
+        Session::flash('success', 'User permanently deleted and anonymized.');
         redirect('index.php?action=users');
     }
 

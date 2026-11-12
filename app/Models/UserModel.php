@@ -136,8 +136,13 @@ final class UserModel
 
     public static function hardDelete(int $id): void
     {
-        // Perform soft delete to avoid Foreign Key constraint violations
-        self::update($id, ['status' => 'inactive'], []);
+        // Anonymize the user
+        self::update($id, [
+            'full_name' => 'Deleted User',
+            'email' => 'deleted_' . $id . '@example.com',
+            'password_hash' => 'deleted',
+            'status' => 'inactive',
+        ], []);
     }
 
     public static function paginate(array $filters, int $page, int $perPage): array

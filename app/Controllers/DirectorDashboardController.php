@@ -53,16 +53,18 @@ final class DirectorDashboardController
         );
 
         // Evaluations approaching deadlines or (if deadline exists and is overdue)
-        $overdueEvaluations = Database::all(
-            'SELECT ea.id, a.application_number, a.title, ea.deadline, u.full_name as evaluator_name, ea.status
-             FROM evaluator_assignments ea
-             JOIN research_applications a ON a.id = ea.application_id
-             JOIN users u ON u.id = ea.evaluator_user_id
-             WHERE ea.status IN ("assigned","accepted")
-             AND ea.deadline IS NOT NULL
-             AND ea.deadline < DATE("now")
-             ORDER BY ea.deadline ASC LIMIT 20'
-        );
+$today = date('Y-m-d');
+$overdueEvaluations = Database::all(
+    'SELECT ea.id, a.application_number, a.title, ea.deadline, u.full_name as evaluator_name, ea.status
+     FROM evaluator_assignments ea
+     JOIN research_applications a ON a.id = ea.application_id
+     JOIN users u ON u.id = ea.evaluator_user_id
+     WHERE ea.status IN ("assigned","accepted")
+     AND ea.deadline IS NOT NULL
+     AND ea.deadline < ?
+     ORDER BY ea.deadline ASC LIMIT 20',
+    [$today]
+);
 
         // Completed evaluations awaiting official decisions
         $completedAwaitingDecision = Database::all(

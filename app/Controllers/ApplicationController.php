@@ -384,7 +384,47 @@ final class ApplicationController
             redirect('index.php?action=application_view&id=' . $id);
         }
 
-        // documents_complete condition verified inside the workflow fire (§96).
+        // A proposal must have complete structured content before it can leave draft.
+        $requiredSections = [
+            'abstract' => 'Abstract',
+            'background' => 'Background',
+            'problem_statement' => 'Problem statement',
+            'objectives' => 'Research objectives',
+            'research_questions' => 'Research questions / hypotheses',
+            'literature_review' => 'Literature review',
+            'methodology' => 'Research design and methodology',
+            'expected_results' => 'Expected results',
+            'significance' => 'Significance and contribution',
+            'innovation' => 'Innovation / originality',
+            'references_text' => 'References and citations',
+        ];
+        $missing = [];
+        foreach ($requiredSections as $field => $label) {
+            if (trim((string) ($app[$field] ?? '')) === '') {
+                $missing[] = $label;
+            }
+        }
+        if (empty($app['research_type_id'])) {
+            $missing[] = 'Research type';
+        }
+        if ((float) ($app['budget_requested'] ?? 0) > 0 && trim((string) ($app['budget_justification'] ?? '')) === '') {
+            $missing[] = 'Budget justification';
+        }
+        if ($missing !== []) {
+            Session::flash('error', 'Complete these proposal sections before submission: ' . implode(', ', $missing) . '.');
+            redirect('index.php?action=application_form&id=' . $id);
+        }
+
+        $workPlanCount = (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_work_plan_items WHERE application_id = ?',
+            [$id]
+        );
+        if ($workPlanCount < 1) {
+            Session::flash('error', 'Add at least one work-plan activity before submitting the proposal.');
+            redirect('index.php?action=application_form&id=' . $id);
+        }
+
+        // documents_complete condition is also verified inside the workflow fire (§96).
         [$ok, $err] = WorkflowService::fire($app, 'research_application', 'Submit application', null);
         if (!$ok) {
             Session::flash('error', $err);

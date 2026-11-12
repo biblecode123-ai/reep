@@ -45,6 +45,27 @@ final class DecisionController
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
+        $requiredUniversityEvaluators = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "university"
+               AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
+            [$appId]
+        );
+        $completedUniversityEvaluators = (int) Database::scalar(
+            'SELECT COUNT(DISTINCT e.assignment_id)
+             FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal"
+               AND ea.assignment_level = "university"
+               AND ea.is_active = 1 AND ea.status = "completed"',
+            [$appId]
+        );
+        if ($requiredUniversityEvaluators < 1 || $completedUniversityEvaluators < $requiredUniversityEvaluators) {
+            Session::flash('error', 'All currently assigned university evaluations must be completed before the Director can make a final decision.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+
         $universityAverage = Database::scalar(
             'SELECT AVG(e.weighted_score)
              FROM evaluations e

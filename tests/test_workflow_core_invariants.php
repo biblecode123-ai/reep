@@ -54,6 +54,18 @@ $check('closed status remains closed even if close date is future', DeadlineHelp
 [$conditionOk, $conditionError] = ConditionEvaluator::check('not_a_real_condition', 'research_application', 999999, []);
 $check('unknown workflow conditions fail closed', $conditionOk === false && is_string($conditionError) && $conditionError !== '');
 
+$workflowConditions = Database::all(
+    'SELECT DISTINCT condition_key FROM workflow_transitions WHERE condition_key IS NOT NULL'
+);
+foreach ($workflowConditions as $row) {
+    $key = (string) $row['condition_key'];
+    [, $error] = ConditionEvaluator::check($key, 'not_a_research_entity', 999999, []);
+    $check(
+        'configured workflow condition is implemented: ' . $key,
+        !is_string($error) || !str_starts_with($error, 'Unsupported workflow condition:')
+    );
+}
+
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),
     'reference_number' => 'TEST-WF-REF-' . bin2hex(random_bytes(4)),

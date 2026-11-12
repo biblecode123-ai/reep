@@ -590,7 +590,7 @@ final class FinalReportController
             return;
         }
         $assignments = FinalReportModel::assignments($reportId);
-        $documentUrl = url('download.php?id=' . (int) $report['document_id']);
+        $documentUrl = base_url('download.php?id=' . (int) $report['document_id']);
         $eligibleCollegeEvaluators = $isCoordinator
             ? self::eligibleEvaluators($report, 'college')
             : [];

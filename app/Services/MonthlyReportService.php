@@ -31,7 +31,7 @@ final class MonthlyReportService
             'SELECT p.id, p.project_number, p.title, p.pi_user_id, p.college_id
              FROM research_projects p
              WHERE p.status_code IN ("ACTIVE","PROGRESS_MONITORING")
-               AND COALESCE(p.actual_start, p.approved_start, p.created_at) <= ?
+               AND COALESCE(p.actual_start, p.planned_start, DATE(p.created_at)) <= ?
                AND NOT EXISTS (
                  SELECT 1 FROM progress_reports pr
                  WHERE pr.project_id = p.id

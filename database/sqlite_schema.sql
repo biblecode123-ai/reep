@@ -597,6 +597,8 @@ CREATE TABLE evaluations (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id    INTEGER NOT NULL,
     assignment_id     INTEGER NULL,
+    rubric_template_id INTEGER NULL,
+    rubric_snapshot    TEXT NULL,
     evaluator_user_id INTEGER NOT NULL,
     evaluation_type TEXT CHECK (evaluation_type IN ('proposal','final')) NOT NULL DEFAULT 'proposal',
     evaluation_round  INTEGER NOT NULL DEFAULT 1, -- increments on re-evaluation (§25)
@@ -615,7 +617,8 @@ CREATE TABLE evaluations (
     updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_eval_assignment_round UNIQUE (assignment_id, evaluation_round),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
-    FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,\n    FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    FOREIGN KEY (assignment_id)     REFERENCES evaluator_assignments (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (rubric_template_id) REFERENCES rubric_templates (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (amended_from_id)   REFERENCES evaluations (id)           ON DELETE SET NULL ON UPDATE CASCADE
 );

@@ -516,7 +516,7 @@ CREATE TABLE evaluator_assignments (
     decline_reason    TEXT NULL,
     reminder_sent_at  DATETIME NULL,
     is_active         INTEGER NOT NULL DEFAULT 1,
-    CONSTRAINT uq_evalassign UNIQUE (application_id, evaluator_user_id),
+    CONSTRAINT uq_evalassign_stage UNIQUE (application_id, evaluator_user_id, assignment_level),
     FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (assigned_by)       REFERENCES users (id)                 ON DELETE SET NULL ON UPDATE CASCADE

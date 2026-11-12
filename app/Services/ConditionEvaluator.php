@@ -17,6 +17,7 @@ final class ConditionEvaluator
         return match ($key) {
             'documents_complete'      => self::documentsComplete($entityType, $entityId),
             'evaluations_passed'      => self::evaluationsPassed($entityType, $entityId),
+            'evaluations_complete'    => self::evaluationsComplete($entityType, $entityId),
             'univ_evaluations_complete'=> self::univEvaluationsComplete($entityType, $entityId),
             'ethics_required'         => self::ethicsRequired($entity),
             'ethics_cleared'          => self::ethicsCleared($entityType, $entityId, $entity),
@@ -118,32 +119,43 @@ final class ConditionEvaluator
     private static function evaluationsComplete(string $entityType, int $id): array
     {
         if ($entityType !== 'research_application') {
-            return [true, null];
+            return [false, 'College evaluation completion applies only to research applications.'];
         }
-        $app = Database::one('SELECT call_id, status_code, revision_submitted_at FROM research_applications WHERE id = ?', [$id]);
-        $required = (int) (Database::scalar(
-            'SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]
-        ) ?? Settings::int('college_evaluators_default', 1));
-        // After a revision only evaluations submitted for the NEW version count,
-        // so a stale round-1 evaluation can never satisfy re-evaluation (§25).
+        $app = Database::one(
+            'SELECT revision_submitted_at, status_code FROM research_applications WHERE id = ?',
+            [$id]
+        );
+        if ($app === null) {
+            return [false, 'Research application not found.'];
+        }
+        $required = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "college"
+               AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
+            [$id]
+        );
+        if ($required < 1) {
+            return [false, 'No active college evaluator assignments exist.'];
+        }
+
+        $params = [$id];
+        $revisionFilter = '';
         if ($app['revision_submitted_at'] !== null
             && in_array($app['status_code'], ['REVISION_SUBMITTED', 'RE_EVALUATION'], true)) {
-            $done = (int) Database::scalar(
-                'SELECT COUNT(DISTINCT evaluator_user_id) FROM evaluations
-                 WHERE application_id = ? AND status = "submitted" AND submitted_at > ? AND evaluation_type = "proposal"',
-                [$id, $app['revision_submitted_at']]
-            );
-            return $done >= $required
-                ? [true, null]
-                : [false, 'Re-evaluations of the revised version are not complete (' . $done . '/' . $required . ').'];
+            $revisionFilter = ' AND e.submitted_at > ?';
+            $params[] = $app['revision_submitted_at'];
         }
         $done = (int) Database::scalar(
-            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
-            [$id]
+            'SELECT COUNT(DISTINCT e.assignment_id) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"
+               AND ea.is_active = 1 AND ea.status = "completed"' . $revisionFilter,
+            $params
         );
         return $done >= $required
             ? [true, null]
-            : [false, 'Required evaluations not complete (' . $done . '/' . $required . ').'];
+            : [false, 'College evaluations are incomplete (' . $done . '/' . $required . ' active assignments completed).'];
     }
 
     private static function ethicsRequired(array $entity): array

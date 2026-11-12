@@ -317,9 +317,9 @@ final class DocumentService
                 return true;
             }
 
-            $committeeAssignment = \\App\\Models\\CommitteeModel::activeAssignment($applicationId);
+            $committeeAssignment = \App\Models\CommitteeModel::activeAssignment($applicationId);
             return $committeeAssignment !== null
-                && \\App\\Models\\CommitteeModel::isMember(
+                && \App\Models\CommitteeModel::isMember(
                     (int) $committeeAssignment['committee_id'],
                     (int) Auth::id()
                 );

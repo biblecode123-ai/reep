@@ -9,6 +9,7 @@ use App\Core\Csrf;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Models\ApplicationModel;
 use App\Models\CommitteeModel;
 use App\Services\WorkflowService;
@@ -44,6 +45,21 @@ final class DecisionController
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
+        $universityAverage = Database::scalar(
+            'SELECT AVG(e.weighted_score)
+             FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"
+               AND ea.is_active = 1 AND ea.status = "completed"',
+            [$appId]
+        );
+        if ($universityAverage === null) {
+            Session::flash('error', 'The university evaluator scores must be complete before the Director makes a final decision.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+        $universityPassingScore = max(0.0, min(100.0, (float) Settings::get('university_proposal_passing_score', '50')));
+
         $committeeDecision = CommitteeModel::latestDecision($appId);
         if ($committeeDecision === null) {
             Session::flash('error', 'The assigned university committee must record its decision before Directorate confirmation.');
@@ -66,6 +82,11 @@ final class DecisionController
         ];
         if (!isset($map[$decision])) {
             Session::flash('error', 'Invalid final decision.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+        if ($decision === 'accepted' && (float) $universityAverage < $universityPassingScore) {
+            Session::flash('error', 'The university proposal average (' . round((float) $universityAverage, 2)
+                . '/100) is below the Director-configured passing threshold (' . $universityPassingScore . '/100). Acceptance is blocked; reject or return the proposal for revision.');
             redirect('index.php?action=application_view&id=' . $appId);
         }
         if (!in_array($committeeDecision['decision'], $map[$decision]['committee'], true)) {

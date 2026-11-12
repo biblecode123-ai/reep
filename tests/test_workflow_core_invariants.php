@@ -75,6 +75,30 @@ foreach ($workflowConditions as $key) {
     );
 }
 
+$validRubric = [
+    ['name' => 'Criterion A', 'max_points' => 40, 'indicators' => [
+        ['name' => 'Indicator A1', 'max_points' => 15],
+        ['name' => 'Indicator A2', 'max_points' => 25],
+    ]],
+    ['name' => 'Criterion B', 'max_points' => 60, 'indicators' => [
+        ['name' => 'Indicator B1', 'max_points' => 30],
+        ['name' => 'Indicator B2', 'max_points' => 30],
+    ]],
+];
+$check('complete indicator rubric with 100 points is valid', RubricModel::validateDefinition($validRubric) === []);
+$badTotal = $validRubric;
+$badTotal[1]['max_points'] = 59;
+$check('rubric criterion totals other than 100 are rejected', RubricModel::validateDefinition($badTotal) !== []);
+$badIndicators = $validRubric;
+$badIndicators[0]['indicators'][0]['max_points'] = 14;
+$check('indicator maxima must equal their criterion maximum', RubricModel::validateDefinition($badIndicators) !== []);
+$missingIndicators = $validRubric;
+$missingIndicators[0]['indicators'] = [];
+$check('criteria without indicators are rejected', RubricModel::validateDefinition($missingIndicators) !== []);
+$duplicateIndicators = $validRubric;
+$duplicateIndicators[0]['indicators'][1]['name'] = 'Indicator A1';
+$check('duplicate indicator names within a criterion are rejected', RubricModel::validateDefinition($duplicateIndicators) !== []);
+
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),
     'reference_number' => 'TEST-WF-REF-' . bin2hex(random_bytes(4)),

@@ -123,6 +123,27 @@ $evaluationColumns = Database::all("PRAGMA table_info(evaluations)");
 $evaluationColumnNames = array_column($evaluationColumns, 'name');
 $check('evaluations retain a rubric version and immutable snapshot', in_array('rubric_template_id', $evaluationColumnNames, true) && in_array('rubric_snapshot', $evaluationColumnNames, true));
 
+$seedOutput = [];
+$seedExit = 1;
+exec('php ' . escapeshellarg(BASE_PATH . '/scripts/seed_institutional_rubrics.php'), $seedOutput, $seedExit);
+$check('all four master-prompt rubric versions seed successfully', $seedExit === 0);
+foreach (array_keys(RubricModel::TYPES) as $rubricType) {
+    $activeRubric = RubricModel::activeFor($rubricType);
+    $check('active rubric exists: ' . $rubricType, $activeRubric !== null);
+    if ($activeRubric !== null) {
+        $criterionTotal = array_sum(array_map(static fn(array $criterion): float => (float) $criterion['max_points'], $activeRubric['criteria']));
+        $indicatorsMatch = true;
+        foreach ($activeRubric['criteria'] as $criterion) {
+            $indicatorTotal = array_sum(array_map(static fn(array $indicator): float => (float) $indicator['max_points'], $criterion['indicators']));
+            if (abs($indicatorTotal - (float) $criterion['max_points']) > 0.001) {
+                $indicatorsMatch = false;
+            }
+        }
+        $check('rubric totals 100: ' . $rubricType, abs($criterionTotal - 100.0) < 0.001);
+        $check('indicator maxima match criteria: ' . $rubricType, $indicatorsMatch);
+    }
+}
+
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),
     'reference_number' => 'TEST-WF-REF-' . bin2hex(random_bytes(4)),

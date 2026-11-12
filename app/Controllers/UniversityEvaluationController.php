@@ -228,18 +228,32 @@ final class UniversityEvaluationController
             EvaluationModel::setAssignmentStatus((int) $assignment['id'], 'completed');
         });
         
-        $required = max(1, Settings::int('university_evaluators_default', 1));
-        $done = (int) Database::scalar(
-            'SELECT COUNT(DISTINCT e.evaluator_user_id) FROM evaluations e
-             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
-             WHERE e.application_id = ? AND e.status = "submitted"
-               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"',
+        $required = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "university"
+               AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
             [$appId]
         );
-        
-        if ($done >= $required) {
+        $done = (int) Database::scalar(
+            'SELECT COUNT(DISTINCT e.assignment_id) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"
+               AND ea.is_active = 1 AND ea.status = "completed"',
+            [$appId]
+        );
+
+        if ($required > 0 && $done >= $required) {
             $app = ApplicationModel::find($appId);
-            WorkflowService::fire($app, 'research_application', 'Submit university evaluation', 'All university evaluations submitted');
+            [$transitioned, $transitionError] = WorkflowService::fire(
+                $app,
+                'research_application',
+                'Submit university evaluation',
+                'All assigned university evaluations submitted'
+            );
+            if (!$transitioned) {
+                Session::flash('warning', $transitionError);
+            }
         }
         
         Session::flash('success', 'University evaluation submitted.');

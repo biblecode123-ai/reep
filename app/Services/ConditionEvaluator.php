@@ -90,6 +90,17 @@ final class ConditionEvaluator
                AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
             [$id]
         );
+        $openConflicts = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments ea
+             LEFT JOIN evaluator_conflicts ec ON ec.assignment_id = ea.id AND ec.resolved = "open"
+             WHERE ea.application_id = ? AND ea.assignment_level = "university"
+               AND ea.is_active = 1
+               AND (ea.status = "conflict_declared" OR ec.id IS NOT NULL)',
+            [$id]
+        );
+        if ($openConflicts > 0) {
+            return [false, 'University evaluator conflicts must be resolved before this stage can be finalized.'];
+        }
         $done = (int) Database::scalar(
             'SELECT COUNT(DISTINCT e.assignment_id)
              FROM evaluations e

@@ -22,7 +22,7 @@ $tableExists = static function (string $table) use ($sqlite): bool {
 };
 
 if (!$tableExists('application_team_members')) {
-    $pk = $sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'BIGINT UNSIGNED NOT NULL AUTOINCREMENT';
+    $pk = $sqlite ? 'INTEGER PRIMARY KEY AUTOINCREMENT' : 'BIGINT UNSIGNED NOT NULL AUTO_INCREMENT';
     $pkLine = $sqlite ? '' : "        PRIMARY KEY (id),\n";
     $fkType = $sqlite ? 'INTEGER' : 'BIGINT UNSIGNED';
     $enumRole = $sqlite ? "TEXT CHECK (role IN ('PI', 'co_investigator'))" : "ENUM('PI', 'co_investigator')";

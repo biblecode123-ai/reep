@@ -118,6 +118,25 @@ final class ProjectController
                 'joined_at'   => date('Y-m-d'),
                 'status'      => 'active',
             ]);
+
+            // Preserve the accepted proposal team when the approved application
+            // becomes a project. Pending or declined invitations are not members.
+            $acceptedTeam = Database::all(
+                'SELECT user_id, role FROM application_team_members
+                 WHERE application_id = ? AND status = "accepted" AND user_id <> ?',
+                [(int) $app['id'], (int) $app['pi_user_id']]
+            );
+            foreach ($acceptedTeam as $member) {
+                ProjectModel::addMember([
+                    'project_id'   => $projectId,
+                    'user_id'      => (int) $member['user_id'],
+                    'member_role'  => $member['role'] === 'co_investigator' ? 'co_investigator' : 'other',
+                    'joined_at'    => date('Y-m-d'),
+                    'status'       => 'active',
+                    'approved_by'  => Auth::id(),
+                ]);
+            }
+
             // Default milestones from the work plan (§40).
             foreach (\App\Models\ApplicationModel::workPlan((int) $app['id']) as $i => $wp) {
                 ProjectModel::addMilestone([

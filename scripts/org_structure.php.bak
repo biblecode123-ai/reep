@@ -1,0 +1,53 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Madda Walabu University — canonical organizational structure (§5).
+ * Single source of truth shared by install.php, seed_roles.php and
+ * update_org_structure.php. Do not rename codes once deployed.
+ */
+
+return [
+    'colleges' => [
+        // code => [canonical name, legacy names renamed to it]
+        'RPEE' => ['RPEE Office', []],
+        'CBE'  => ['College of Business and Economics', []],
+        'CSSH' => ['College of Social Sciences and Humanities', []],
+        'CNCS' => ['College of Natural and Computational Sciences', []],
+        'CANR' => ['College of Agriculture and Natural Resources', ['College of Agriculture and Veterinary Medicine']],
+        'CEBS' => ['College of Education and Behavioral Sciences', []],
+        'COE'  => ['College of Engineering', ['College of Engineering and Technology']],
+        'CC'   => ['College of Computing', []],
+        'SHS'  => ['School of Health Sciences', []],
+        'SM'   => ['School of Medicine', []],
+        'SL'   => ['School of Law', []],
+    ],
+
+    'departments' => [
+        'CBE'  => [['Accounting and Finance', 'ACCFIN'], ['Economics', 'ECON'], ['Management', 'MGMT'], ['Marketing', 'MKTG'],
+                   ['Tourism Management', 'TOURM'], ['Logistics and Supply Chain Management', 'LSCM'],
+                   ['Cooperative Economics and Management', 'COEM'], ['Business Administration', 'BUSAD']],
+        'CSSH' => [['Geography and Environmental Studies', 'GES'], ['History and Heritage Management', 'HHM'], ['Sociology', 'SOC'],
+                   ['Journalism and Communication', 'JCOM'], ['English Language and Literature', 'ENG'],
+                   ['Afaan Oromoo Language and Literature', 'AFAAN'], ['Amharic Language and Literature', 'AMH'],
+                   ['Civics and Ethical Studies', 'CES'], ['Social Anthropology', 'SANTH'],
+                   ['Political Science and International Relations', 'PSIR']],
+        'CNCS' => [['Biology', 'BIO'], ['Chemistry', 'CHEM'], ['Mathematics', 'MATH'], ['Physics', 'PHYS'],
+                   ['Statistics', 'STAT'], ['Sport Science', 'SPORT'], ['Environmental Science', 'ENVSCI']],
+        'CANR' => [['Agronomy', 'AGRO'], ['Horticulture', 'HORT'], ['Animal Science', 'ANSC'], ['Agricultural Economics', 'AGEC'],
+                   ['Natural Resource Management', 'NRM'], ['Forestry', 'FOR'], ['Plant Science', 'PLSC'],
+                   ['Agricultural Extension', 'AGEXT'], ['Soil and Water Management', 'SWM'], ['Agricultural Engineering', 'AGENG']],
+        'CEBS' => [['Educational Planning and Management', 'EPM'], ['Psychology', 'PSY'], ['Adult Education', 'ADE'],
+                   ['Community Development', 'CDEV'], ['Teacher Education', 'TED'], ['Curriculum and Instruction', 'CI'],
+                   ['Educational Leadership', 'EL']],
+        'COE'  => [['Civil Engineering', 'CIVL'], ['Electrical and Computer Engineering', 'ECE'], ['Mechanical Engineering', 'MECH'],
+                   ['Construction Engineering', 'CONENG'], ['Water Resources Engineering', 'WRE'],
+                   ['Surveying and Mapping Engineering', 'SURV'], ['Computer Engineering', 'CPENG']],
+        'CC'   => [['Computer Science', 'CS'], ['Information Technology', 'IT'], ['Information Systems', 'IS'], ['Software Engineering', 'SE']],
+        'SHS'  => [['Nursing', 'NURS'], ['Midwifery', 'MIDW'], ['Public Health', 'PUBH']],
+        'SM'   => [['Medicine and Surgery', 'MED'], ['Anatomy', 'ANAT'], ['Anesthesia', 'ANES'],
+                   ['Medical Laboratory', 'MEDLAB'], ['Psychiatry', 'PSYCH']],
+        'SL'   => [['Law', 'LAW']],
+        'RPEE' => [['Research Management', 'RM']],
+    ],
+];

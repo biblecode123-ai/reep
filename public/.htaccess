@@ -1,0 +1,8 @@
+# Application web root — the ONLY publicly served directory.
+# Re-grants access (the project root .htaccess denies by default and this
+# directory inherits that denial unless explicitly granted here).
+<IfModule mod_authz_core.c>
+    Require all granted
+</IfModule>
+
+Options -Indexes

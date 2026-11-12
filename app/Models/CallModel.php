@@ -1,0 +1,157 @@
+<?php
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Core\Database;
+
+/**
+ * Research calls (spec §11–§14).
+ */
+final class CallModel
+{
+    public static function paginate(array $filters, int $page, int $perPage): array
+    {
+        $where  = ['1=1'];
+        $params = [];
+        if (!empty($filters['status'])) {
+            $where[]  = 'c.status = ?';
+            $params[] = $filters['status'];
+        }
+        if (!empty($filters['q'])) {
+            $where[]  = '(c.title LIKE ? OR c.reference_number LIKE ?)';
+            $like     = '%' . $filters['q'] . '%';
+            $params[] = $like;
+            $params[] = $like;
+        }
+        $whereSql = implode(' AND ', $where);
+
+        $total = (int) Database::scalar("SELECT COUNT(*) FROM research_calls c WHERE $whereSql", $params);
+        $rows  = Database::all(
+            "SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name,
+                    (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
+             FROM research_calls c
+             LEFT JOIN users u ON u.id = c.created_by
+             LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             WHERE $whereSql
+             ORDER BY c.created_at DESC
+             LIMIT " . (int) $perPage . ' OFFSET ' . (int) (($page - 1) * $perPage),
+            $params
+        );
+        return ['total' => $total, 'rows' => $rows];
+    }
+
+    public static function openCalls(): array
+    {
+        $now = Database::isSqlite() ? "datetime('now')" : 'NOW()';
+        return Database::all(
+            "SELECT c.*, th.name AS theme_name,
+                    (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
+             FROM research_calls c
+             LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             WHERE c.status IN ('published','open') AND (c.closes_at IS NULL OR c.closes_at > $now)
+             ORDER BY c.closes_at ASC"
+        );
+    }
+
+    public static function find(int $id): ?array
+    {
+        return Database::one(
+            'SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name
+             FROM research_calls c
+             LEFT JOIN users u ON u.id = c.created_by
+             LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             WHERE c.id = ?',
+            [$id]
+        );
+    }
+
+    public static function create(array $data): int
+    {
+        if (!isset($data['call_number'])) {
+            $data['call_number'] = \App\Services\NumberingService::next('research_call');
+        }
+        return Database::insert('research_calls', $data);
+    }
+
+    public static function update(int $id, array $data): void
+    {
+        Database::update('research_calls', $data, 'id = ?', [$id]);
+    }
+
+    public static function setEligibility(int $callId, array $rows): void
+    {
+        Database::transaction(function () use ($callId, $rows): void {
+            Database::run('DELETE FROM research_call_eligibility WHERE call_id = ?', [$callId]);
+            foreach ($rows as $r) {
+                Database::insert('research_call_eligibility', [
+                    'call_id'         => $callId,
+                    'eligibility_key' => $r['key'],
+                    'ref_id'          => $r['ref_id'] ?? null,
+                    'ref_value'       => $r['value'] ?? null,
+                ]);
+            }
+        });
+    }
+
+    public static function eligibility(int $callId): array
+    {
+        return Database::all('SELECT * FROM research_call_eligibility WHERE call_id = ?', [$callId]);
+    }
+
+    public static function setRequirements(int $callId, array $rows): void
+    {
+        Database::transaction(function () use ($callId, $rows): void {
+            Database::run('DELETE FROM research_call_requirements WHERE call_id = ?', [$callId]);
+            foreach ($rows as $i => $r) {
+                Database::insert('research_call_requirements', [
+                    'call_id'          => $callId,
+                    'document_type_id' => (int) $r['document_type_id'],
+                    'requirement'      => $r['requirement'],
+                    'condition_note'   => $r['condition_note'] ?? null,
+                    'sort_order'       => $i,
+                ]);
+            }
+        });
+    }
+
+    public static function requirements(int $callId): array
+    {
+        return Database::all(
+            'SELECT r.*, dt.type_code, dt.name AS type_name
+             FROM research_call_requirements r JOIN document_types dt ON dt.id = r.document_type_id
+             WHERE r.call_id = ? ORDER BY r.sort_order',
+            [$callId]
+        );
+    }
+
+    public static function setCriteria(int $callId, array $rows): void
+    {
+        Database::transaction(function () use ($callId, $rows): void {
+            Database::run('DELETE FROM research_call_criteria WHERE call_id = ?', [$callId]);
+            foreach ($rows as $i => $r) {
+                Database::insert('research_call_criteria', [
+                    'call_id'        => $callId,
+                    'criterion_name' => $r['name'],
+                    'description'    => $r['description'] ?? null,
+                    'weight_pct'     => $r['weight'],
+                    'sort_order'     => $i,
+                ]);
+            }
+        });
+    }
+
+    public static function criteria(int $callId): array
+    {
+        return Database::all(
+            'SELECT * FROM research_call_criteria WHERE call_id = ? ORDER BY sort_order',
+            [$callId]
+        );
+    }
+
+    /** Alias used by the evaluation flow. */
+    public static function criteriaFor(int $callId): array
+    {
+        return self::criteria($callId);
+    }
+}

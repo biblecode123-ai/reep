@@ -1,0 +1,13 @@
+# MWU RPEE — Apache hardening for XAMPP deployment
+# The root index.php forwards visitors to public/ (the only served directory).
+# Subdirectories (app/, config/, database/, routes/, scripts/, docs/, storage/)
+# each carry their own .htaccess that denies all web access.
+
+Options -Indexes
+
+# Never serve sensitive files from the project root (README/notes are fine to block too).
+<FilesMatch "\.(sql|sh|sqlite|sqlite-wal|sqlite-shm|log|ini|env|bak|dist)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>

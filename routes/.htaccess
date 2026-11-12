@@ -1,0 +1,4 @@
+# Route definitions are never web-accessible.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>

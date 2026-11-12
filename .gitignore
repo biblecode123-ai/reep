@@ -1,0 +1,12 @@
+# Runtime data & secrets
+storage/*
+!storage/.htaccess
+
+# Env & local config overrides
+.env
+config/*.local.php
+
+# OS / editor noise
+Thumbs.db
+.DS_Store
+*.log

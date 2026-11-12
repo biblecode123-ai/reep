@@ -1,0 +1,4 @@
+# Block all web access to application code, configuration and SQL.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>

@@ -1,0 +1,4 @@
+# CLI scripts (install, seeders, tests) must never be reachable over HTTP.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>

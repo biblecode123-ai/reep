@@ -1,0 +1,4 @@
+# The SQLite database file and schema/seed SQL are never web-accessible.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>

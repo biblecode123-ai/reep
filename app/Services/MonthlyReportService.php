@@ -81,6 +81,48 @@ final class MonthlyReportService
         return self::dueProjects($period);
     }
 
+
+
+    /**
+     * Notify PIs on the configured reminder and due dates.
+     * The method is intentionally deterministic so a daily cron does not
+     * send duplicate reminders on every run.
+     */
+    public static function notifySchedule(?\DateTimeImmutable $now = null): int
+    {
+        $timezoneName = Settings::get('timezone', 'Africa/Addis_Ababa') ?: 'Africa/Addis_Ababa';
+        $now ??= new \DateTimeImmutable('now', new \DateTimeZone($timezoneName));
+        $dueDay = max(1, min(28, Settings::int('monthly_report_due_day', 5)));
+        $reminderDays = max(0, min(14, Settings::int('monthly_report_reminder_days', 3)));
+
+        $day = (int) $now->format('j');
+        $lastDay = (int) $now->format('t');
+        $reminderDay = max(1, $dueDay - $reminderDays);
+        if ($day !== $reminderDay && $day !== $dueDay) {
+            return 0;
+        }
+
+        $period = $now->format('Y-m');
+        $due = self::dueProjects($period);
+        $sent = 0;
+        foreach ($due as $project) {
+            $kind = $day === $dueDay ? 'due' : 'reminder';
+            $message = $kind === 'due'
+                ? 'Your monthly research progress report for ' . $period . ' is due today.'
+                : 'Your monthly research progress report for ' . $period . ' is due on day ' . $dueDay . '.';
+            NotificationService::send(
+                (int) $project['pi_user_id'],
+                'monthly_report_' . $kind,
+                'Monthly research report ' . ($kind === 'due' ? 'due today' : 'reminder'),
+                $project['project_number'] . ' — ' . $message,
+                'index.php?action=project_view&id=' . (int) $project['id'] . '#reports',
+                $kind === 'due' ? 'high' : 'normal'
+            );
+            $sent++;
+        }
+        return $sent;
+    }
+
     /**
      * Emit one audit event for scheduler execution; safe to run repeatedly.
      */

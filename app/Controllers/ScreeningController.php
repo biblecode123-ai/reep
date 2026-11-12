@@ -260,7 +260,7 @@ final class ScreeningController
 
             // Check 3: Cannot already be assigned
             $existing = Database::scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+                'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1',
                 [$id, $uid]
             );
             if ((int) $existing > 0) {
@@ -532,8 +532,20 @@ final class ScreeningController
         
         // Check that required evaluations are complete before forwarding
         if ($decision === 'forward_to_university') {
-            $required = (int) (Database::scalar('SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]) ?? 2);
-            $completed = (int) Database::scalar('SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted"', [$id]);
+            $required = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND assignment_level = "college" AND is_active = 1
+                   AND status NOT IN ("cancelled","declined","conflict_declared")',
+                [$id]
+            );
+            $completed = (int) Database::scalar(
+                'SELECT COUNT(DISTINCT e.assignment_id) FROM evaluations e
+                 JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+                 WHERE e.application_id = ? AND e.status = "submitted"
+                   AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"
+                   AND ea.is_active = 1 AND ea.status = "completed"',
+                [$id]
+            );
             if ($completed < $required) {
                 Session::flash('error', "Cannot forward: only $completed of $required required evaluations are complete.");
                 redirect('index.php?action=application_view&id=' . $id);

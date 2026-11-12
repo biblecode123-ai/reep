@@ -138,13 +138,17 @@ final class AdminController
         
         // Prevent deleting yourself
         if ($id === Auth::id()) {
-            Session::flash('error', 'You cannot delete your own account.');
+            Session::flash('error', 'You cannot deactivate your own account.');
             redirect('index.php?action=users');
         }
 
-        UserModel::update($id, ['status' => 'inactive'], []);
-        Audit::log('user.deactivated', 'user', $id);
-        Session::flash('success', 'User marked as inactive.');
+        // Toggle logic: if inactive, make active. If active, make inactive.
+        $user = UserModel::findById($id);
+        $newStatus = ($user['status'] === 'active') ? 'inactive' : 'active';
+        
+        UserModel::update($id, ['status' => $newStatus], null);
+        Audit::log('user.' . ($newStatus === 'active' ? 'activated' : 'deactivated'), 'user', $id);
+        Session::flash('success', 'User ' . $newStatus . 'ated successfully.');
         redirect('index.php?action=users');
     }
 

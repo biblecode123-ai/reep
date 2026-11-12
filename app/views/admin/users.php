@@ -45,10 +45,10 @@
     <td class="actions">
       <?php if (Gate::allows('user.manage')): ?>
         <a class="btn btn-outline btn-sm" href="<?= e(url('action=user_form&id=' . $u['id'])) ?>">Edit</a>
-        <form method="post" action="<?= e(url('action=user_delete')) ?>" style="display:inline;" data-confirm="Are you sure you want to deactivate this user?">
+        <form method="post" action="<?= e(url('action=user_delete')) ?>" style="display:inline;" data-confirm="Are you sure you want to toggle this user's status?">
           <?= \App\Core\Csrf::field() ?>
           <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
-          <button class="btn btn-secondary btn-sm" type="submit">Deactivate</button>
+          <button class="btn btn-secondary btn-sm" type="submit"><?= $u['status'] === 'active' ? 'Deactivate' : 'Activate' ?></button>
         </form>
         <form method="post" action="<?= e(url('action=user_destroy')) ?>" style="display:inline;" data-confirm="Are you sure you want to PERMANENTLY DELETE this user? This cannot be undone.">
           <?= \App\Core\Csrf::field() ?>

@@ -204,9 +204,19 @@ final class FinalReportController
         Csrf::verifyRequest();
         $reportId = (int) ($_POST['final_report_id'] ?? 0);
         $report = FinalReportModel::find($reportId);
-        if ($report === null || !in_array($report['status'], ['college_passed','university_revision_required'], true)) {
+        if ($report === null || !in_array($report['status'], ['college_passed','university_revision_required','university_evaluation'], true)) {
             Session::flash('error', 'The report must pass college evaluation before university evaluators can be assigned.');
             redirect('index.php?action=projects');
+        }
+
+        $forwarded = (int) Database::scalar(
+            'SELECT COUNT(*) FROM project_final_report_decisions
+             WHERE final_report_id = ? AND stage = "college" AND decision = "forward_to_university"',
+            [$reportId]
+        );
+        if ($forwarded < 1) {
+            Session::flash('error', 'The College Coordinator must formally forward the passed report before University evaluators can be assigned.');
+            redirect('index.php?action=final_report_view&id=' . $reportId);
         }
 
         $required = max(1, Settings::int('university_evaluators_default', 1));
@@ -601,7 +611,7 @@ final class FinalReportController
         $canSubmitRevision = $isPi && in_array($report['status'], ['college_revision_required','university_revision_required'], true);
         $canAssignCollege = $isCoordinator && in_array($report['status'], ['submitted_to_college','college_evaluation'], true);
         $canForward = $isCoordinator && $report['status'] === 'college_passed';
-        $canAssignUniversity = $isDirector && in_array($report['status'], ['college_passed','university_revision_required'], true);
+        $canAssignUniversity = $isDirector && in_array($report['status'], ['college_passed','university_revision_required','university_evaluation'], true);
         $canDecide = $isDirector && $report['status'] === 'university_passed';
         include APP_PATH . '/views/research/project_final_report_view.php';
     }

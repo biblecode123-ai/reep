@@ -29,7 +29,7 @@ final class AdminController
             'status'   => (string) ($_GET['status'] ?? ''),
             'role'     => (string) ($_GET['role'] ?? ''),
         ];
-        $p = paginate((int) Database::scalar('SELECT COUNT(*) FROM users') ?: 1, $page, 20);
+        $p = paginate((int) Database::scalar('SELECT COUNT(*) FROM users u WHERE 1=1 ' . ($filters['college'] ? ' AND college_id = ' . $filters['college'] : '')) ?: 1, $page, 20);
         $result = UserModel::paginate($filters, $p['page'], $p['limit']);
         $p = paginate($result['total'], $page, 20);
         $rows = $result['rows'];

@@ -29,7 +29,7 @@ final class EvaluationController
             redirect('index.php?action=my_evaluations');
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status NOT IN ("conflict_declared","declined","cancelled")',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
@@ -128,7 +128,7 @@ final class EvaluationController
             exit;
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1 AND status IN ("assigned","accepted")',
+            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status IN ("assigned","accepted")',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
@@ -232,7 +232,7 @@ final class EvaluationController
             redirect('index.php?action=my_evaluations');
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1 AND status IN ("assigned","accepted")',
+            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status IN ("assigned","accepted")',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {

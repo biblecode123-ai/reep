@@ -119,7 +119,7 @@ final class FinalReportController
 
         $version = (int) ($latest['version'] ?? 0) + 1;
         $status = $latest !== null && $latest['status'] === 'university_revision_required'
-            ? 'university_evaluation'
+            ? 'university_revision_required'
             : 'submitted_to_college';
 
         $reportId = Database::transaction(function () use ($projectId, $documentId, $version, $status): int {
@@ -555,7 +555,10 @@ final class FinalReportController
         $isTeam = self::isProjectTeamMember((int) $report['project_id'], $userId);
         $isCoordinator = Gate::hasRole('college_coordinator') && (int) (Auth::user()['college_id'] ?? 0) === (int) $report['college_id'];
         $isDirector = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
-        $isAssigned = FinalReportModel::assignmentForUser($reportId, $userId) !== null;
+        $userAssignment = FinalReportModel::assignmentForUser($reportId, $userId);
+        $isAssigned = $userAssignment !== null
+            && !in_array($userAssignment['status'], ['conflict_declared','declined','cancelled'], true)
+            && (int) $userAssignment['is_active'] === 1;
         if (!$isPi && !$isTeam && !$isCoordinator && !$isDirector && !$isAssigned) {
             http_response_code(403);
             include APP_PATH . '/views/errors/403.php';

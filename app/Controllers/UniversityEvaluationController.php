@@ -226,6 +226,13 @@ final class UniversityEvaluationController
             redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
         }
         $recBudget = (float) $recBudgetRaw;
+        $strengths = trim((string) ($_POST['strengths'] ?? ''));
+        $weaknesses = trim((string) ($_POST['weaknesses'] ?? ''));
+        $overall = trim((string) ($_POST['overall_comment'] ?? ''));
+        if ($strengths === '' || $weaknesses === '' || $overall === '') {
+            Session::flash('error', 'Strengths, weaknesses, and the overall evaluation summary are required.');
+            redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
+        }
         $recommendation = (string) ($_POST['recommendation'] ?? '');
         if (!in_array($recommendation, ['accept', 'accept_with_revision', 'major_revision', 'reject'], true)) {
             Session::flash('error', 'Select a final university evaluation recommendation.');
@@ -286,9 +293,9 @@ final class UniversityEvaluationController
                 'recommendation' => $recommendation,
                 'weighted_score' => $weighted,
                 'max_score' => 100,
-                'strengths' => trim((string) ($_POST['strengths'] ?? '')) ?: null,
-                'weaknesses' => trim((string) ($_POST['weaknesses'] ?? '')) ?: null,
-                'overall_comment' => trim((string) ($_POST['overall_comment'] ?? '')) ?: null,
+                'strengths' => $strengths,
+                'weaknesses' => $weaknesses,
+                'overall_comment' => $overall,
                 'status' => 'submitted',
                 'submitted_at' => date('Y-m-d H:i:s'),
             ]);

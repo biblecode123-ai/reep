@@ -12,6 +12,8 @@ use App\Core\Session;
 use App\Models\ApplicationModel;
 use App\Models\CallModel;
 use App\Models\EvaluationModel;
+use App\Models\RubricModel;
+use App\Services\RubricScoringService;
 use App\Services\WorkflowService;
 
 /**
@@ -47,9 +49,16 @@ final class EvaluationController
             Session::flash('warning', 'This evaluation is overdue by ' . floor((time() - strtotime($assignment['deadline'])) / 86400) . ' days.');
         }
 
-        $criteria = CallModel::criteriaFor((int) $app['call_id']);
         $round = EvaluationModel::nextRound($appId, Auth::id());
         $draft = EvaluationModel::findDraft($appId, Auth::id(), $round);
+        $rubric = !empty($draft['rubric_template_id'])
+            ? RubricModel::findById((int) $draft['rubric_template_id'])
+            : RubricModel::activeFor('college_proposal');
+        if ($rubric === null) {
+            Session::flash('error', 'The Research Director must publish a complete College Proposal rubric before evaluation can begin.');
+            redirect('index.php?action=my_evaluations');
+        }
+        $criteria = $rubric['criteria'];
 
         // Load proposal team (co-investigators) for display / blind review check.
         // Uses application_team_members — the proposal-stage team table (§26);
@@ -81,13 +90,10 @@ final class EvaluationController
         // Load draft scores and comments if draft exists
         $draftData = [];
         if ($draft) {
-            $draftScores = Database::all(
-                'SELECT criterion_id, score, comment FROM evaluation_scores WHERE evaluation_id = ?',
-                [(int) $draft['id']]
-            );
-            foreach ($draftScores as $s) {
-                $draftData['scores'][$s['criterion_id']] = $s['score'];
-                $draftData['score_comments'][$s['criterion_id']] = $s['comment'];
+            $draftScores = RubricScoringService::scoresForEvaluation((int) $draft['id']);
+            foreach ($draftScores as $indicatorId => $scoreData) {
+                $draftData['scores'][$indicatorId] = $scoreData['score'];
+                $draftData['score_comments'][$indicatorId] = $scoreData['comment'];
             }
 
             // Parse structured feedback from recommendations field
@@ -128,80 +134,34 @@ final class EvaluationController
             exit;
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status IN ("assigned","accepted")',
+            'SELECT * FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college"
+               AND is_active = 1 AND status IN ("assigned","accepted")',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
-            echo json_encode(['ok' => false, 'message' => 'No active evaluation assignment found.']);
+            echo json_encode(['ok' => false, 'message' => 'No active college evaluation assignment found.']);
             exit;
         }
-        $criteria = CallModel::criteriaFor((int) $app['call_id']);
-        if (!$criteria) {
-            echo json_encode(['ok' => false, 'message' => 'The call has no evaluation criteria configured.']);
-            exit;
-        }
+
         $round = EvaluationModel::nextRound($appId, Auth::id());
         $draft = EvaluationModel::findDraft($appId, Auth::id(), $round);
-
-        // Persist draft + scores atomically so a partial save never leaves an
-        // evaluation row without its scores (§6 database transactions).
-        [$evalId, $weighted] = Database::transaction(function () use ($appId, $assignment, $draft, $round, $criteria) {
-        // Create or update draft
-        if ($draft === null) {
-            $evalId = EvaluationModel::createEvaluation([
-                'application_id'    => $appId,
-                'assignment_id'     => (int) $assignment['id'],
-                'evaluator_user_id' => Auth::id(),
-                'evaluation_type'   => 'proposal',
-                'evaluation_round'  => $round,
-                'status'            => 'draft',
-            ]);
-        } else {
-            $evalId = (int) $draft['id'];
+        $rubric = !empty($draft['rubric_template_id'])
+            ? RubricModel::findById((int) $draft['rubric_template_id'])
+            : RubricModel::activeFor('college_proposal');
+        if ($rubric === null) {
+            echo json_encode(['ok' => false, 'message' => 'No published College Proposal rubric is available.']);
+            exit;
+        }
+        $validated = RubricScoringService::validate($rubric, $_POST, false);
+        if ($validated['errors'] !== []) {
+            echo json_encode(['ok' => false, 'message' => implode(' ', $validated['errors'])]);
+            exit;
         }
 
-        // Save scores
-        $total = 0.0; $weightSum = 0.0; $given = 0;
-        foreach ($criteria as $c) {
-            $score = $_POST['score_' . $c['id']] ?? null;
-            if ($score === null || $score === '') {
-                continue;
-            }
-            if (!is_numeric($score)) {
-                continue;
-            }
-            $s = max(0, min(100, (float) $score));
-            EvaluationModel::setScore($evalId, (int) $c['id'], $s, trim((string) ($_POST['score_comment_' . $c['id']] ?? '')) ?: null);
-            $total += $s * ((float) $c['weight_pct'] / 100);
-            $weightSum += (float) $c['weight_pct'];
-            $given++;
-        }
-        // Calculate current weighted score
-        $weighted = $weightSum > 0 ? round($total * (100 / $weightSum), 2) : round($total, 2);
-        return [$evalId, $weighted];
-        });
-
-        // Save feedback fields
-        $recommendation = (string) ($_POST['recommendation'] ?? '');
-        $strengths = trim((string) ($_POST['strengths'] ?? '')) ?: null;
-        $weaknesses = trim((string) ($_POST['weaknesses'] ?? '')) ?: null;
         $methodologyFeedback = trim((string) ($_POST['methodology_feedback'] ?? '')) ?: null;
         $improvementRecommendations = trim((string) ($_POST['improvement_recommendations'] ?? '')) ?: null;
         $ethicsFeasibility = trim((string) ($_POST['ethics_feasibility'] ?? '')) ?: null;
-        $overall = trim((string) ($_POST['overall_comment'] ?? '')) ?: null;
-
-        EvaluationModel::updateEvaluation($evalId, [
-            'recommendation'  => $recommendation ?: null,
-            'weighted_score'  => $weighted,
-            'strengths'       => $strengths,
-            'weaknesses'      => $weaknesses,
-            'recommendations' => $improvementRecommendations,
-            'overall_comment' => $overall,
-            'status'          => 'draft',
-        ]);
-
-        // Store additional structured feedback in a separate field or use existing fields
-        // For now, we'll append to recommendations with clear section markers
         $fullRecommendations = '';
         if ($methodologyFeedback) {
             $fullRecommendations .= "Methodology Feedback:\n" . $methodologyFeedback . "\n\n";
@@ -213,9 +173,42 @@ final class EvaluationController
             $fullRecommendations .= "Recommendations for Improvement:\n" . $improvementRecommendations;
         }
 
-        if ($fullRecommendations) {
-            EvaluationModel::updateEvaluation($evalId, ['recommendations' => $fullRecommendations]);
-        }
+        $weighted = $validated['total'];
+        $evalId = Database::transaction(function () use ($appId, $assignment, $draft, $round, $rubric, $validated, $weighted, $fullRecommendations): int {
+            if ($draft === null) {
+                $evalId = EvaluationModel::createEvaluation([
+                    'application_id' => $appId,
+                    'assignment_id' => (int) $assignment['id'],
+                    'rubric_template_id' => (int) $rubric['id'],
+                    'rubric_snapshot' => RubricModel::snapshot($rubric),
+                    'evaluator_user_id' => Auth::id(),
+                    'evaluation_type' => 'proposal',
+                    'evaluation_round' => $round,
+                    'status' => 'draft',
+                ]);
+            } else {
+                $evalId = (int) $draft['id'];
+                if (empty($draft['rubric_template_id'])) {
+                    EvaluationModel::updateEvaluation($evalId, [
+                        'rubric_template_id' => (int) $rubric['id'],
+                        'rubric_snapshot' => RubricModel::snapshot($rubric),
+                    ]);
+                }
+            }
+
+            RubricScoringService::replaceScores($evalId, $validated['scores']);
+            EvaluationModel::updateEvaluation($evalId, [
+                'weighted_score' => $weighted,
+                'max_score' => 100,
+                'strengths' => trim((string) ($_POST['strengths'] ?? '')) ?: null,
+                'weaknesses' => trim((string) ($_POST['weaknesses'] ?? '')) ?: null,
+                'recommendations' => $fullRecommendations ?: null,
+                'overall_comment' => trim((string) ($_POST['overall_comment'] ?? '')) ?: null,
+                'recommendation' => trim((string) ($_POST['recommendation'] ?? '')) ?: null,
+                'status' => 'draft',
+            ]);
+            return $evalId;
+        });
 
         echo json_encode(['ok' => true, 'message' => 'Draft saved at ' . date('H:i'), 'score' => $weighted]);
         exit;
@@ -232,57 +225,39 @@ final class EvaluationController
             redirect('index.php?action=my_evaluations');
         }
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college" AND is_active = 1 AND status = "accepted"',
+            'SELECT * FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "college"
+               AND is_active = 1 AND status = "accepted"',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
-            Session::flash('error', 'No active evaluation assignment found.');
+            Session::flash('error', 'No active college evaluation assignment found.');
             redirect('index.php?action=my_evaluations');
         }
-
-        // Check deadline - if overdue and policy prohibits, block submission
         if ($assignment['deadline'] && strtotime($assignment['deadline']) < time()) {
-            // For now, allow with warning - policy can be configured to block
             Session::flash('warning', 'This evaluation is overdue. Submission is being recorded.');
         }
 
-        $criteria = CallModel::criteriaFor((int) $app['call_id']);
-        if (!$criteria) {
-            Session::flash('error', 'The call has no evaluation criteria configured.');
-            redirect('index.php?action=my_evaluations');
-        }
         $round = EvaluationModel::nextRound($appId, Auth::id());
         $draft = EvaluationModel::findDraft($appId, Auth::id(), $round);
-
-        // Validate everything BEFORE writing so a rejected submission leaves
-        // no partial rows (§6: transactions prevent partially saved evaluations).
-        $scores = [];
-        $total = 0.0; $weightSum = 0.0;
-        foreach ($criteria as $c) {
-            $score = $_POST['score_' . $c['id']] ?? null;
-            if ($score === null || $score === '' || !is_numeric($score)) {
-                continue;
-            }
-            $s = max(0, min(100, (float) $score));
-            $scores[] = ['criterion_id' => (int) $c['id'], 'score' => $s,
-                'comment' => trim((string) ($_POST['score_comment_' . $c['id']] ?? '')) ?: null];
-            $total += $s * ((float) $c['weight_pct'] / 100);
-            $weightSum += (float) $c['weight_pct'];
+        $rubric = !empty($draft['rubric_template_id'])
+            ? RubricModel::findById((int) $draft['rubric_template_id'])
+            : RubricModel::activeFor('college_proposal');
+        if ($rubric === null) {
+            Session::flash('error', 'No published College Proposal rubric is available.');
+            redirect('index.php?action=my_evaluations');
         }
-        if (!$scores) {
-            Session::flash('error', 'Provide scores for at least one criterion.');
+        $validated = RubricScoringService::validate($rubric, $_POST, true);
+        if ($validated['errors'] !== []) {
+            Session::flash('error', implode(' ', $validated['errors']));
             redirect('index.php?action=evaluation_form&application_id=' . $appId);
         }
-        $weighted = $weightSum > 0 ? round($total * (100 / $weightSum), 2) : round($total, 2);
 
-        // Validate recommendation (existing permitted set only, §5).
         $recommendation = (string) ($_POST['recommendation'] ?? '');
         if (!in_array($recommendation, ['accept', 'accept_with_revision', 'major_revision', 'reject'], true)) {
             Session::flash('error', 'Select a final recommendation.');
             redirect('index.php?action=evaluation_form&application_id=' . $appId);
         }
-
-        // Save feedback fields
         $strengths = trim((string) ($_POST['strengths'] ?? '')) ?: null;
         $weaknesses = trim((string) ($_POST['weaknesses'] ?? '')) ?: null;
         $methodologyFeedback = trim((string) ($_POST['methodology_feedback'] ?? '')) ?: null;
@@ -290,7 +265,6 @@ final class EvaluationController
         $ethicsFeasibility = trim((string) ($_POST['ethics_feasibility'] ?? '')) ?: null;
         $overall = trim((string) ($_POST['overall_comment'] ?? '')) ?: null;
 
-        // Combine structured feedback
         $fullRecommendations = '';
         if ($methodologyFeedback) {
             $fullRecommendations .= "Methodology Feedback:\n" . $methodologyFeedback . "\n\n";
@@ -301,63 +275,70 @@ final class EvaluationController
         if ($improvementRecommendations) {
             $fullRecommendations .= "Recommendations for Improvement:\n" . $improvementRecommendations;
         }
-
         $toResearcher = array_values(array_filter(array_map(
-            static fn($c) => trim((string) $c), (array) ($_POST['comments'] ?? []))));
+            static fn($comment) => trim((string) $comment), (array) ($_POST['comments'] ?? [])
+        )));
         $committeeOnly = array_values(array_filter(array_map(
-            static fn($c) => trim((string) $c), (array) ($_POST['committee_comments'] ?? []))));
+            static fn($comment) => trim((string) $comment), (array) ($_POST['committee_comments'] ?? [])
+        )));
+        $weighted = $validated['total'];
 
-        // Persist evaluation, scores, comments and assignment atomically.
         $evalId = Database::transaction(function () use (
-            $appId, $assignment, $draft, $round, $scores, $weighted, $recommendation,
-            $strengths, $weaknesses, $fullRecommendations, $overall, $toResearcher, $committeeOnly
-        ) {
+            $appId, $assignment, $draft, $round, $rubric, $validated, $weighted,
+            $recommendation, $strengths, $weaknesses, $fullRecommendations, $overall,
+            $toResearcher, $committeeOnly
+        ): int {
             if ($draft === null) {
                 $evalId = EvaluationModel::createEvaluation([
-                    'application_id'    => $appId,
-                    'assignment_id'     => (int) $assignment['id'],
+                    'application_id' => $appId,
+                    'assignment_id' => (int) $assignment['id'],
+                    'rubric_template_id' => (int) $rubric['id'],
+                    'rubric_snapshot' => RubricModel::snapshot($rubric),
                     'evaluator_user_id' => Auth::id(),
-                    'evaluation_type'   => 'proposal',
-                    'evaluation_round'  => $round,
-                    'status'            => 'draft',
+                    'evaluation_type' => 'proposal',
+                    'evaluation_round' => $round,
+                    'status' => 'draft',
                 ]);
             } else {
                 $evalId = (int) $draft['id'];
+                if (empty($draft['rubric_template_id'])) {
+                    EvaluationModel::updateEvaluation($evalId, [
+                        'rubric_template_id' => (int) $rubric['id'],
+                        'rubric_snapshot' => RubricModel::snapshot($rubric),
+                    ]);
+                }
             }
 
-            foreach ($scores as $s) {
-                EvaluationModel::setScore($evalId, $s['criterion_id'], $s['score'], $s['comment']);
-            }
-
+            RubricScoringService::replaceScores($evalId, $validated['scores']);
             EvaluationModel::updateEvaluation($evalId, [
-                'recommendation'  => $recommendation,
-                'weighted_score'  => $weighted,
-                'strengths'       => $strengths,
-                'weaknesses'      => $weaknesses,
+                'recommendation' => $recommendation,
+                'weighted_score' => $weighted,
+                'max_score' => 100,
+                'strengths' => $strengths,
+                'weaknesses' => $weaknesses,
                 'recommendations' => $fullRecommendations ?: null,
                 'overall_comment' => $overall,
-                'status'          => 'submitted',
-                'submitted_at'    => date('Y-m-d H:i:s'),
+                'status' => 'submitted',
+                'submitted_at' => date('Y-m-d H:i:s'),
             ]);
-
-            // Save individual comments to researcher
-            foreach ($toResearcher as $text) {
-                EvaluationModel::addComment($evalId, $text, 'to_researcher', Auth::id());
+            foreach ($toResearcher as $comment) {
+                EvaluationModel::addComment($evalId, $comment, 'to_researcher', Auth::id());
             }
-            // Save confidential committee comments
-            foreach ($committeeOnly as $text) {
-                EvaluationModel::addComment($evalId, $text, 'committee_only', Auth::id());
+            foreach ($committeeOnly as $comment) {
+                EvaluationModel::addComment($evalId, $comment, 'committee_only', Auth::id());
             }
-
             EvaluationModel::setAssignmentStatus((int) $assignment['id'], 'completed');
             return $evalId;
         });
-        Audit::log('evaluation.submitted', 'research_application', $appId, null, ['evaluation' => $evalId, 'score' => $weighted]);
 
-        // Advance the workflow: assigned -> accepted -> under evaluation. The
-        // completion transition only fires once the call's required number of
-        // submitted evaluations is reached (multi-evaluator calls stay
-        // UNDER_EVALUATION until the last required evaluation lands).
+        Audit::log('evaluation.submitted', 'research_application', $appId, null, [
+            'evaluation' => $evalId,
+            'score' => $weighted,
+            'rubric_version' => (int) $rubric['version'],
+        ]);
+
+        // Move the workflow only when all active college assignments have
+        // accepted and submitted their independent rubric evaluation.
         $app = ApplicationModel::find($appId);
         if (in_array($app['status_code'], ['EVALUATOR_ASSIGNED', 'EVALUATOR_ACCEPTED'], true)) {
             $notAccepted = (int) Database::scalar(

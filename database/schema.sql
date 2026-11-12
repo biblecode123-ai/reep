@@ -809,6 +809,7 @@ CREATE TABLE university_budget_recommendations (
     application_id BIGINT UNSIGNED NOT NULL,
     evaluator_id BIGINT UNSIGNED NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
+    justification TEXT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     CONSTRAINT fk_ubr_app FOREIGN KEY (application_id) REFERENCES research_applications(id) ON DELETE CASCADE ON UPDATE CASCADE,

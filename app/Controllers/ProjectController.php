@@ -173,8 +173,11 @@ final class ProjectController
         $isSameCollegeCoordinator = $isCoordinator
             && (int) (Auth::user()['college_id'] ?? 0) > 0
             && (int) (Auth::user()['college_id'] ?? 0) === (int) $project['college_id'];
-        $isInstitutionalManager = Gate::allows('research.manage')
-            || (Gate::allows('project.activate') && !$isCoordinator);
+        // Technical system administrators and committee reviewers do not
+        // automatically receive institution-wide project access.
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isInstitutionalManager = $isDirectorateOfficer
+            && (Gate::allows('research.manage') || Gate::allows('project.activate'));
         if (!$isMember && !$isSameCollegeCoordinator && !$isInstitutionalManager) {
             http_response_code(403);
             include APP_PATH . '/views/errors/403.php';

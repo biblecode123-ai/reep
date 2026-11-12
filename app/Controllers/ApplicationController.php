@@ -245,9 +245,9 @@ final class ApplicationController
         $isInstitutionalReviewer = Gate::allows('research.review')
             && !$isCoordinator;
         $canManage = Gate::allows('research.manage') || $isInstitutionalReviewer;
-        $committeeAssignment = \\App\\Models\\CommitteeModel::activeAssignment($id);
+        $committeeAssignment = \App\Models\CommitteeModel::activeAssignment($id);
         $isCommitteeMember = $committeeAssignment !== null
-            && \\App\\Models\\CommitteeModel::isMember((int) $committeeAssignment['committee_id'], Auth::id());
+            && \App\Models\CommitteeModel::isMember((int) $committeeAssignment['committee_id'], Auth::id());
 
         if (!$isPi && !$isAcceptedTeamMember && !$isAssignedEvaluator
             && !$isSameCollegeCoordinator && !$canManage && !$isCommitteeMember) {

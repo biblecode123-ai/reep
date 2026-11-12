@@ -554,11 +554,45 @@ final class ScreeningController
             }
         }
 
-        // Validate new evaluator is from same college
-        $newEvaluatorCollege = Database::scalar('SELECT college_id FROM users WHERE id = ?', [$newEvaluatorId]);
-        if ((int) $newEvaluatorCollege !== (int) $assignment['college_id']) {
-            Session::flash('error', 'New evaluator must be from the same college.');
-            redirect('index.php');
+        // Validate the replacement is an active evaluator in the same college,
+        // is not on the research team, and has no detected conflict.
+        $newEvaluator = Database::one(
+            'SELECT u.id, u.college_id, u.status
+             FROM users u
+             JOIN user_roles ur ON ur.user_id = u.id
+             JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
+             WHERE u.id = ?',
+            [$newEvaluatorId]
+        );
+        if ($newEvaluator === null || $newEvaluator['status'] !== 'active'
+            || (int) $newEvaluator['college_id'] !== (int) $assignment['college_id']) {
+            Session::flash('error', 'New evaluator must be an active evaluator from the same college.');
+            redirect('index.php?action=application_view&id=' . (int) $assignment['application_id']);
+        }
+        $teamConflict = (int) Database::scalar(
+            'SELECT COUNT(*) FROM application_team_members
+             WHERE application_id = ? AND user_id = ? AND status <> "declined"',
+            [(int) $assignment['application_id'], $newEvaluatorId]
+        ) > 0;
+        if ($newEvaluatorId === (int) Database::scalar('SELECT pi_user_id FROM research_applications WHERE id = ?', [(int) $assignment['application_id']])
+            || $teamConflict) {
+            Session::flash('error', 'A principal investigator or research-team member cannot be an evaluator.');
+            redirect('index.php?action=application_view&id=' . (int) $assignment['application_id']);
+        }
+        $conflictWarning = EvaluationModel::detectConflicts((int) $assignment['application_id'], $newEvaluatorId);
+        if ($conflictWarning !== null) {
+            Session::flash('error', 'The replacement evaluator has a conflict of interest: ' . $conflictWarning);
+            redirect('index.php?action=application_view&id=' . (int) $assignment['application_id']);
+        }
+        $duplicateActive = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = ?
+               AND is_active = 1',
+            [(int) $assignment['application_id'], $newEvaluatorId, $assignment['assignment_level']]
+        );
+        if ($duplicateActive > 0) {
+            Session::flash('error', 'The selected evaluator already has an active assignment for this stage.');
+            redirect('index.php?action=application_view&id=' . (int) $assignment['application_id']);
         }
 
         // Mark old assignment as cancelled (preserve history)
@@ -569,6 +603,7 @@ final class ScreeningController
         $newAssignmentId = Database::insert('evaluator_assignments', [
             'application_id' => (int) $assignment['application_id'],
             'evaluator_user_id' => $newEvaluatorId,
+            'assignment_level' => $assignment['assignment_level'],
             'assigned_by' => Auth::id(),
             'deadline' => $assignment['deadline'],
             'status' => 'assigned',

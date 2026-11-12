@@ -8,6 +8,7 @@ use App\Core\Database;
 use App\Core\Gate;
 use App\Models\ApplicationModel;
 use App\Models\CallModel;
+use App\Services\MonthlyReportService;
 use App\Services\NotificationService;
 
 /**

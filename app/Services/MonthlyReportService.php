@@ -1,10 +1,12 @@
 <?php
 declare(strict_types=1);
 
-namespace AppServices;
+namespace App\Services;
 
-use AppCoreAudit;
-use AppCoreDatabase;
+use App\Core\Audit;
+use App\Core\Database;
+use App\Core\Settings;
+use App\Services\NotificationService;
 
 /**
  * Canonical monthly-report scheduler.
@@ -23,7 +25,7 @@ final class MonthlyReportService
     /**
      * Return active projects that have no submitted/approved report for the period.
      */
-    public static function dueProjects(?string $period = null): array
+    public static function dueProjects(?string $period = null, ?int $userId = null): array
     {
         $period ??= self::currentPeriod();
 
@@ -33,20 +35,29 @@ final class MonthlyReportService
         }
         $periodEnd = $periodStart->modify('last day of this month')->format('Y-m-d');
 
-        return Database::all(
-            'SELECT p.id, p.project_number, p.title, p.pi_user_id, p.college_id
+        $sql = 'SELECT p.id, p.project_number, p.title, p.pi_user_id, p.college_id
              FROM research_projects p
+             JOIN research_project_members m ON m.project_id = p.id
              WHERE p.status_code IN ("ACTIVE","PROGRESS_MONITORING")
+               AND m.status = "active"
                AND COALESCE(p.actual_start, p.planned_start, DATE(p.created_at)) <= ?
                AND NOT EXISTS (
                  SELECT 1 FROM progress_reports pr
                  WHERE pr.project_id = p.id
                    AND pr.reporting_period = ?
                    AND pr.status IN ("submitted","approved","revision_required")
-               )
-             ORDER BY p.id',
-            [$periodEnd, $period]
-        );
+               )';
+        
+        $params = [$periodEnd, $period];
+        
+        if ($userId) {
+            $sql .= ' AND m.user_id = ?';
+            $params[] = $userId;
+        }
+
+        $sql .= ' ORDER BY p.id';
+
+        return Database::all($sql, $params);
     }
 
     /**
@@ -75,10 +86,23 @@ final class MonthlyReportService
         ];
     }
 
-    public static function overdueProjects(?string $period = null): array
+    public static function overdueProjects(?string $period = null, ?int $userId = null, ?int $collegeId = null): array
     {
         $period ??= self::currentPeriod();
-        return self::dueProjects($period);
+        $dueDay = Settings::int('monthly_report_due_day', 5);
+        $today = (int) (new \DateTimeImmutable())->format('d');
+        
+        if ($today <= $dueDay) {
+            return [];
+        }
+
+        $due = self::dueProjects($period, $userId);
+        
+        if ($collegeId) {
+            $due = array_filter($due, fn($p) => (int)$p['college_id'] === $collegeId);
+        }
+        
+        return $due;
     }
 
 

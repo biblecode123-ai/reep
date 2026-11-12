@@ -399,7 +399,7 @@ CREATE TABLE research_calls (
     budget_currency                 CHAR(3) NOT NULL DEFAULT 'ETB',
     max_applications_per_researcher INT NULL DEFAULT 1,
     evaluation_mode                 ENUM('open','single_blind','double_blind') NOT NULL DEFAULT 'single_blind',
-    required_evaluators             INT NULL DEFAULT 1,         -- institutional default: one college evaluator
+    required_evaluators             INT NULL DEFAULT 2,         -- POLICY DECISION WF-2 default
     status                          ENUM('draft','published','open','closed','under_evaluation','completed','archived') NOT NULL DEFAULT 'draft',
     published_at                    DATETIME NULL,
     closed_at                       DATETIME NULL,
@@ -593,7 +593,7 @@ CREATE TABLE evaluator_assignments (
     reminder_sent_at  DATETIME NULL,
     is_active         TINYINT(1) NOT NULL DEFAULT 1,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_evalassign (application_id, evaluator_user_id),
+    UNIQUE KEY uq_evalassign_stage (application_id, evaluator_user_id, assignment_level),
     KEY idx_evalassign_evaluator (evaluator_user_id, status),
     CONSTRAINT fk_ea_app FOREIGN KEY (application_id)    REFERENCES research_applications (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     CONSTRAINT fk_ea_usr FOREIGN KEY (evaluator_user_id) REFERENCES users (id)                 ON DELETE RESTRICT ON UPDATE CASCADE,

@@ -223,16 +223,37 @@ final class ApplicationController
             Session::flash('error', 'Application not found.');
             redirect('index.php?action=applications');
         }
-        // Entity-level authorization (Rule 5 layered over RBAC).
+        // Entity-level authorization: a general research.view permission is
+        // not sufficient to read every confidential application.
         $isPi = (int) $app['pi_user_id'] === Auth::id();
-        $canManage = Gate::allows('research.manage', 'research.screen', 'research.review');
-        $isAssignedEvaluator = (bool) Database::scalar(
-            'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+        $isAcceptedTeamMember = (bool) Database::scalar(
+            'SELECT COUNT(*) FROM application_team_members WHERE application_id = ? AND user_id = ? AND status = "accepted"',
             [$id, Auth::id()]
         );
-        if (!$isPi && !$canManage && !$isAssignedEvaluator && Gate::denies('research.view')) {
-            Session::flash('error', 'You are not authorized to view this application.');
-            redirect('index.php');
+        $isAssignedEvaluator = (bool) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1
+               AND status NOT IN ("conflict_declared", "declined", "cancelled")',
+            [$id, Auth::id()]
+        );
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isSameCollegeCoordinator = $isCoordinator
+            && (int) (Auth::user()['college_id'] ?? 0) > 0
+            && (int) (Auth::user()['college_id'] ?? 0) === (int) $app['college_id'];
+        // University-level reviewers may see the institutional queue; college
+        // coordinators are deliberately excluded from this global permission path.
+        $isInstitutionalReviewer = Gate::allows('research.review')
+            && !$isCoordinator;
+        $canManage = Gate::allows('research.manage') || $isInstitutionalReviewer;
+        $committeeAssignment = \\App\\Models\\CommitteeModel::activeAssignment($id);
+        $isCommitteeMember = $committeeAssignment !== null
+            && \\App\\Models\\CommitteeModel::isMember((int) $committeeAssignment['committee_id'], Auth::id());
+
+        if (!$isPi && !$isAcceptedTeamMember && !$isAssignedEvaluator
+            && !$isSameCollegeCoordinator && !$canManage && !$isCommitteeMember) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
         }
 
         $documents = DocumentService::listFor('research_application', $id);

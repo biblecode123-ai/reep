@@ -264,6 +264,10 @@ final class EvaluationController
         $improvementRecommendations = trim((string) ($_POST['improvement_recommendations'] ?? '')) ?: null;
         $ethicsFeasibility = trim((string) ($_POST['ethics_feasibility'] ?? '')) ?: null;
         $overall = trim((string) ($_POST['overall_comment'] ?? '')) ?: null;
+        if ($strengths === null || $weaknesses === null || $overall === null) {
+            Session::flash('error', 'Strengths, weaknesses, and the overall evaluation summary are required.');
+            redirect('index.php?action=evaluation_form&application_id=' . $appId);
+        }
 
         $fullRecommendations = '';
         if ($methodologyFeedback) {

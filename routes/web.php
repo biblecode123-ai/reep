@@ -82,6 +82,10 @@ return [
     'agreement_issue'      => [\App\Controllers\AgreementController::class, 'issue', 'research.manage'],
     'agreement_sign'       => [\App\Controllers\AgreementController::class, 'sign', 'research.submit'],
 
+    // Institutional rubric versions — only the Research Director publishes policy rubrics.
+    'rubrics'              => [\\App\\Controllers\\RubricController::class, 'index', 'research.manage'],
+    'rubric_save'          => [\\App\\Controllers\\RubricController::class, 'save', 'research.manage'],
+
     // Evaluation
     'evaluation_form'     => [\App\Controllers\EvaluationController::class, 'form', 'research.evaluate'],
     'evaluation_save_draft' => [\App\Controllers\EvaluationController::class, 'saveDraft', 'research.evaluate'],

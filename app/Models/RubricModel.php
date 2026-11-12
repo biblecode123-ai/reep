@@ -92,7 +92,7 @@ final class RubricModel
         return $errors;
     }
 
-    public static function createVersion(string $type, array $criteria, int $userId): int
+    public static function createVersion(string $type, array $criteria, ?int $userId): int
     {
         if (!isset(self::TYPES[$type])) {
             throw new InvalidArgumentException('Unknown institutional rubric type.');

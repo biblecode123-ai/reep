@@ -44,9 +44,15 @@ final class MonthlyReportController
             redirect('index.php?action=project_view&id=' . $projectId);
         }
 
-        $month = (int) ($_POST['month'] ?? 0);
-        $year = (int) ($_POST['year'] ?? 0);
-        if ($month < 1 || $month > 12 || $year < 2000 || $year > (int) date('Y') + 1 || !checkdate($month, 1, $year)) {
+        $yearMonth = trim((string) ($_POST['year_month'] ?? ''));
+        if (preg_match('/^(\\d{4})-(\\d{2})$/', $yearMonth, $m)) {
+            $year = (int) $m[1];
+            $month = (int) $m[2];
+        } else {
+            $month = (int) ($_POST['month'] ?? 0);
+            $year = (int) ($_POST['year'] ?? 0);
+        }
+        if ($month < 1 || $month > 12 || $year < 2000 || $year > (int) date('Y') || !checkdate($month, 1, $year)) {
             Session::flash('error', 'Select a valid reporting month and year.');
             redirect('index.php?action=project_view&id=' . $projectId . '#reports');
         }

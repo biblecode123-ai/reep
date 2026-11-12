@@ -27,6 +27,12 @@ final class MonthlyReportService
     {
         $period ??= self::currentPeriod();
 
+        $periodStart = \DateTimeImmutable::createFromFormat('!Y-m-d', $period . '-01');
+        if ($periodStart === false) {
+            throw new \InvalidArgumentException('Invalid reporting period: ' . $period);
+        }
+        $periodEnd = $periodStart->modify('last day of this month')->format('Y-m-d');
+
         return Database::all(
             'SELECT p.id, p.project_number, p.title, p.pi_user_id, p.college_id
              FROM research_projects p
@@ -39,7 +45,7 @@ final class MonthlyReportService
                    AND pr.status IN ("submitted","approved","revision_required")
                )
              ORDER BY p.id',
-            [$period . '-31', $period]
+            [$periodEnd, $period]
         );
     }
 

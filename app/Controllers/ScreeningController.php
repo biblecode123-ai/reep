@@ -530,7 +530,12 @@ final class ScreeningController
             redirect('index.php?action=application_view&id=' . $id);
         }
         
-        // Check that required evaluations are complete before forwarding
+        if (($app['status_code'] ?? '') !== 'EVALUATION_COMPLETED') {
+            Session::flash('error', 'College endorsement decisions are only available after the required college evaluations are complete.');
+            redirect('index.php?action=application_view&id=' . $id);
+        }
+
+        // Require every active college assignment to have a submitted evaluation.
         if ($decision === 'forward_to_university') {
             $required = (int) Database::scalar(
                 'SELECT COUNT(*) FROM evaluator_assignments
@@ -546,34 +551,39 @@ final class ScreeningController
                    AND ea.is_active = 1 AND ea.status = "completed"',
                 [$id]
             );
-            if ($completed < $required) {
-                Session::flash('error', "Cannot forward: only $completed of $required required evaluations are complete.");
+            if ($required < 1 || $completed < $required) {
+                Session::flash('error', "Cannot forward: only {$completed} of {$required} active college evaluator assignments are complete.");
                 redirect('index.php?action=application_view&id=' . $id);
             }
         }
-        
-        // Record the college decision
-        Database::insert('college_decisions', [
-            'application_id'   => $id,
-            'decision_context' => 'committee',
-            'decision'         => $decision === 'forward_to_university' ? 'forward_to_university' : 
-                                 ($decision === 'reject_at_college' ? 'reject' : 'revision_required'),
-            'comments'         => $comment,
-            'decided_by'       => Auth::id(),
-        ]);
-        
-        // Fire the appropriate workflow transition
+
         $transition = match ($decision) {
             'forward_to_university' => 'Send to university evaluation',
-            'reject_at_college'     => 'College reject',
+            'reject_at_college'     => 'Reject at college',
             'return_for_revision'   => 'Request revision',
         };
-        
-        $app = ApplicationModel::find($id);
-        [$ok, $err] = WorkflowService::fire($app, 'research_application', $transition, $comment);
-        
-        if (!$ok) {
-            Session::flash('error', $err);
+        $decisionCode = match ($decision) {
+            'forward_to_university' => 'forward_to_university',
+            'reject_at_college'     => 'reject',
+            'return_for_revision'   => 'revision_required',
+        };
+
+        try {
+            Database::transaction(function () use ($id, $decisionCode, $comment, $app, $transition): void {
+                Database::insert('college_decisions', [
+                    'application_id'   => $id,
+                    'decision_context' => 'college_endorsement',
+                    'decision'         => $decisionCode,
+                    'comments'         => $comment,
+                    'decided_by'       => Auth::id(),
+                ]);
+                [$ok, $error] = WorkflowService::fire($app, 'research_application', $transition, $comment);
+                if (!$ok) {
+                    throw new \\RuntimeException($error ?? 'College decision transition failed.');
+                }
+            });
+        } catch (\\Throwable $e) {
+            Session::flash('error', $e->getMessage());
             redirect('index.php?action=application_view&id=' . $id);
         }
         

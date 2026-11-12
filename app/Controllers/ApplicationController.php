@@ -129,26 +129,70 @@ final class ApplicationController
             Session::flash('error', 'Your account has no college assigned. Contact the administrator.');
             redirect('index.php');
         }
-        $data = [
-            'call_id'         => (int) $call['id'],
-            'title'           => $clean['title'],
-            'college_id'      => $collegeId,
-            'department_id'   => ((int) $user['department_id']) ?: null,
-            'abstract'        => null,
-            'background'      => null,
-            'problem_statement' => null,
-            'objectives'      => null,
-            'research_questions' => null,
-            'literature_review' => null,
-            'methodology'     => null,
-            'expected_results' => null,
-            'significance'    => null,
-            'innovation'      => null,
-            'references_text' => null,
-            'budget_requested' => (float) ($clean['budget'] ?? 0),
-            'budget_justification' => trim((string) ($_POST['budget_justification'] ?? '')) ?: null,
-            'requires_ethics' => $clean['requires_ethics'],
+        $structuredFields = [
+            'research_area', 'abstract', 'background', 'problem_statement', 'objectives',
+            'research_questions', 'literature_review', 'methodology', 'expected_results',
+            'significance', 'innovation', 'references_text',
         ];
+        $data = [
+            'call_id'             => (int) $call['id'],
+            'title'               => $clean['title'],
+            'research_type_id'    => ((int) ($_POST['research_type_id'] ?? 0)) ?: null,
+            'research_theme_id'   => ((int) ($_POST['research_theme_id'] ?? 0)) ?: null,
+            'research_area'       => trim((string) ($_POST['research_area'] ?? '')) ?: null,
+            'college_id'          => $collegeId,
+            'department_id'       => ((int) $user['department_id']) ?: null,
+            'duration_months'     => ((int) ($_POST['duration_months'] ?? 0)) ?: null,
+            'proposed_start_date' => trim((string) ($_POST['proposed_start_date'] ?? '')) ?: null,
+            'proposed_end_date'   => trim((string) ($_POST['proposed_end_date'] ?? '')) ?: null,
+            'budget_requested'   => (float) ($clean['budget'] ?? 0),
+            'budget_justification' => trim((string) ($_POST['budget_justification'] ?? '')) ?: null,
+            'requires_ethics'     => $clean['requires_ethics'],
+        ];
+        foreach ($structuredFields as $field) {
+            $data[$field] = trim((string) ($_POST[$field] ?? '')) ?: null;
+        }
+
+        $researchTypeId = (int) ($data['research_type_id'] ?? 0);
+        if ($researchTypeId > 0 && (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_types WHERE id = ? AND is_active = 1',
+            [$researchTypeId]
+        ) !== 1) {
+            Session::flash('error', 'Select a valid active research type.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        $researchThemeId = (int) ($data['research_theme_id'] ?? 0);
+        if ($researchThemeId > 0 && (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_themes WHERE id = ? AND is_active = 1',
+            [$researchThemeId]
+        ) !== 1) {
+            Session::flash('error', 'Select a valid active research theme.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        if ($data['duration_months'] !== null && ((int) $data['duration_months'] < 1
+            || (!empty($call['max_duration_months']) && (int) $data['duration_months'] > (int) $call['max_duration_months']))) {
+            Session::flash('error', 'The proposed duration is outside the permitted call duration.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        foreach (['proposed_start_date', 'proposed_end_date'] as $dateField) {
+            if ($data[$dateField] !== null) {
+                $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $data[$dateField]);
+                if (!$date || $date->format('Y-m-d') !== $data[$dateField]) {
+                    Session::flash('error', 'Enter valid proposed start and end dates.');
+                    redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+                }
+            }
+        }
+        if ($data['proposed_start_date'] && $data['proposed_end_date']
+            && $data['proposed_end_date'] < $data['proposed_start_date']) {
+            Session::flash('error', 'The proposed end date must be after the proposed start date.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
+        if ((float) $data['budget_requested'] < 0
+            || (!empty($call['max_budget']) && (float) $data['budget_requested'] > (float) $call['max_budget'])) {
+            Session::flash('error', 'Requested budget is outside the permitted call budget.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
+        }
 
         try {
             if ($id > 0) {

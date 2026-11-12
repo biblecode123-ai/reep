@@ -24,8 +24,22 @@
           </option>
           <?php endforeach; ?>
         </select>
+        <?php if ($app !== null): ?><input type="hidden" name="call_id" value="<?= (int) $app['call_id'] ?>"><?php endif; ?>
       </div>
       <div><label>Research title <span class="req">*</span></label><input type="text" name="title" required maxlength="250" value="<?= e($app['title'] ?? '') ?>"></div>
+    </div>
+    <div class="form-row">
+      <div><label>Research type</label>
+        <select name="research_type_id">
+          <option value="">— select research type —</option>
+          <?php foreach ($types as $type): ?>
+            <option value="<?= (int) $type['id'] ?>" <?= (int) ($app['research_type_id'] ?? 0) === (int) $type['id'] ? 'selected' : '' ?>><?= e($type['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div><label>Research area / discipline</label>
+        <input type="text" name="research_area" maxlength="150" value="<?= e($app['research_area'] ?? '') ?>">
+      </div>
     </div>
     <div class="form-row">
       <div><label>Research theme</label>
@@ -47,11 +61,56 @@
   </div>
 
   <div class="card">
+    <h2 class="mt0">Structured research proposal</h2>
+    <p class="muted">Complete the proposal sections below. The system stores these fields separately for screening and evaluation; the uploaded document remains the official full proposal attachment.</p>
+    <label>Abstract</label>
+    <textarea name="abstract" rows="4"><?= e($app['abstract'] ?? '') ?></textarea>
+    <label>Background</label>
+    <textarea name="background" rows="5"><?= e($app['background'] ?? '') ?></textarea>
+    <label>Problem statement</label>
+    <textarea name="problem_statement" rows="5"><?= e($app['problem_statement'] ?? '') ?></textarea>
+    <label>Research objectives</label>
+    <textarea name="objectives" rows="4"><?= e($app['objectives'] ?? '') ?></textarea>
+    <label>Research questions / hypotheses</label>
+    <textarea name="research_questions" rows="4"><?= e($app['research_questions'] ?? '') ?></textarea>
+    <label>Literature review and theoretical framework</label>
+    <textarea name="literature_review" rows="5"><?= e($app['literature_review'] ?? '') ?></textarea>
+    <label>Research design and methodology</label>
+    <textarea name="methodology" rows="5"><?= e($app['methodology'] ?? '') ?></textarea>
+    <label>Expected results</label>
+    <textarea name="expected_results" rows="4"><?= e($app['expected_results'] ?? '') ?></textarea>
+    <label>Significance and contribution</label>
+    <textarea name="significance" rows="4"><?= e($app['significance'] ?? '') ?></textarea>
+    <label>Innovation / originality</label>
+    <textarea name="innovation" rows="4"><?= e($app['innovation'] ?? '') ?></textarea>
+    <label>References and citations</label>
+    <textarea name="references_text" rows="5"><?= e($app['references_text'] ?? '') ?></textarea>
+  </div>
+
+  <div class="card">
+    <h2 class="mt0">Budget and duration</h2>
+    <div class="form-row">
+      <div><label>Requested budget (ETB) <span class="req">*</span></label>
+        <input type="number" name="budget" min="0" step="0.01" required value="<?= e((string) ($app['budget_requested'] ?? '0')) ?>">
+      </div>
+      <div><label>Proposed duration (months)</label>
+        <input type="number" name="duration_months" min="1" max="<?= (int) ($call['max_duration_months'] ?? 120) ?>" value="<?= e((string) ($app['duration_months'] ?? '')) ?>">
+      </div>
+    </div>
+    <div class="form-row">
+      <div><label>Proposed start date</label><input type="date" name="proposed_start_date" value="<?= e($app['proposed_start_date'] ?? '') ?>"></div>
+      <div><label>Proposed end date</label><input type="date" name="proposed_end_date" value="<?= e($app['proposed_end_date'] ?? '') ?>"></div>
+    </div>
+    <label>Budget justification</label>
+    <textarea name="budget_justification" rows="4"><?= e($app['budget_justification'] ?? '') ?></textarea>
+  </div>
+
+  <div class="card">
     <h2 class="mt0">Proposal document</h2>
     <p>Upload the full proposal as a <strong>single PDF or Word document</strong> (`.pdf`, `.docx`).</p>
     <p>The proposal document must contain the following sections in this order: Abstract, Background, Problem statement, Objectives, Research questions, Literature review, Methodology, Expected results, Significance, Innovation, References.</p>
     <label>Upload Proposal <span class="req">*</span></label>
-    <input type="file" name="proposal_document" accept=".pdf,.docx" required>
+    <input type="file" name="proposal_document" accept=".pdf,.docx" <?= $app === null ? 'required' : '' ?>>
   </div>
 
 

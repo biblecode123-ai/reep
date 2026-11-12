@@ -3,7 +3,7 @@
 PRAGMA foreign_keys = ON;
 
 INSERT INTO roles (name, display_name, description, is_system) VALUES
-('system_admin',          'System Administrator',                 'Full system administration', 1),
+('system_admin',          'System Administrator',                 'Technical system administration without academic decision authority', 1),
 ('rpee_director',         'RPEE Director',                        'Head of the Research, Publication, Ethics and Extension Office', 1),
 ('rpee_officer',          'RPEE Officer',                         'RPEE staff managing calls, review, budget and reporting', 1),
 ('univ_committee',        'University Research Committee Member', 'Member of the university research committee', 1),
@@ -90,8 +90,11 @@ INSERT INTO permissions (name, module, description) VALUES
 ('integrity.view',           'system',      'View research integrity cases'),
 ('integrity.manage',         'system',      'Manage research integrity cases');
 
+-- Technical administrator has no academic workflow or decision permissions.
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'system_admin';
+SELECT r.id, p.id FROM roles r JOIN permissions p
+  ON p.name IN ('user.view','user.manage','org.view','audit.view')
+WHERE r.name = 'system_admin';
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p

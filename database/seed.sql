@@ -102,7 +102,7 @@ INSERT INTO permissions (name, module, description) VALUES
 -- and confidential academic review remain with the designated academic roles.
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r JOIN permissions p
-  ON p.name IN ('user.view','user.manage','org.view','audit.view')
+  ON p.name IN ('user.view','user.manage','user.roles','org.view','org.manage','workflow.manage','settings.manage','audit.view')
 WHERE r.name = 'system_admin';
 
 -- RPEE Director — full institutional authority

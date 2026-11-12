@@ -144,6 +144,20 @@ foreach (array_keys(RubricModel::TYPES) as $rubricType) {
     }
 }
 
+$finalReportTables = (int) Database::scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN (
+        'project_final_reports','project_evaluator_assignments','project_evaluations',
+        'project_evaluation_indicator_scores','project_final_report_decisions'
+    )"
+);
+$check('SQLite schema contains all completed-report evaluation tables', $finalReportTables === 5);
+$mysqlSeed = file_get_contents(BASE_PATH . '/database/seed.sql');
+$check('MySQL seed defaults to one evaluator', str_contains($mysqlSeed, "('required_evaluators_default','1'"));
+$check('MySQL seed contains college and university evaluator settings', str_contains($mysqlSeed, "'college_evaluators_default'") && str_contains($mysqlSeed, "'university_evaluators_default'"));
+$check('MySQL seed contains independent completed-report passing thresholds', str_contains($mysqlSeed, "'college_report_passing_score'") && str_contains($mysqlSeed, "'university_report_passing_score'"));
+$documentServiceSource = file_get_contents(BASE_PATH . '/app/Services/DocumentService.php');
+$check('technical system administrator has no unconditional document-access bypass', !str_contains($documentServiceSource, 'if (Gate::isAdmin())'));
+
 $callId = CallModel::create([
     'call_number' => 'TEST-WF-' . bin2hex(random_bytes(4)),
     'reference_number' => 'TEST-WF-REF-' . bin2hex(random_bytes(4)),

@@ -6,6 +6,7 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
+use App\Core\DeadlineHelper;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
@@ -322,6 +323,15 @@ final class ApplicationController
             Session::flash('error', 'Only draft applications can be submitted.');
             redirect('index.php?action=application_view&id=' . $id);
         }
+
+        // Enforce the official call window server-side, including for drafts
+        // created before opening or submitted after the closing instant.
+        $call = CallModel::find((int) $app['call_id']);
+        if ($call === null || !DeadlineHelper::isCallOpen($call)) {
+            Session::flash('error', 'This research call is not currently accepting submissions. Check its official opening and closing dates.');
+            redirect('index.php?action=application_view&id=' . $id);
+        }
+
         // documents_complete condition verified inside the workflow fire (§96).
         [$ok, $err] = WorkflowService::fire($app, 'research_application', 'Submit application', null);
         if (!$ok) {

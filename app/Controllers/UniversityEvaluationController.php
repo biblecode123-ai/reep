@@ -8,6 +8,7 @@ use App\Core\Csrf;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
+use App\Core\Settings;
 use App\Models\ApplicationModel;
 use App\Models\EvaluationModel;
 use App\Services\WorkflowService;
@@ -72,6 +73,22 @@ final class UniversityEvaluationController
             Session::flash('error', 'Application not found.');
             redirect('index.php?action=applications');
         }
+        if (($app['status_code'] ?? '') !== 'UNIV_EVAL_ASSIGNMENT_PENDING') {
+            Session::flash('error', 'Only college-endorsed proposals in the university evaluator assignment stage can be assigned.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+        $collegeScore = Database::scalar(
+            'SELECT AVG(e.weighted_score) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"',
+            [$appId]
+        );
+        $passingScore = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
+        if ($collegeScore === null || (float) $collegeScore < $passingScore) {
+            Session::flash('error', 'The college proposal evaluation has not met the configured passing threshold.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
 
         $required = max(1, Settings::int('university_evaluators_default', 1));
         $evaluators = array_values(array_unique(array_filter(array_map('intval', $evaluators), static fn(int $id): bool => $id > 0)));
@@ -80,13 +97,33 @@ final class UniversityEvaluationController
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
+        foreach ($evaluators as $evaluatorId) {
+            $eligible = (int) Database::scalar(
+                'SELECT COUNT(*) FROM users u
+                 JOIN research_evaluators re ON re.user_id = u.id
+                 WHERE u.id = ? AND u.status = "active" AND re.availability_status = "available"',
+                [$evaluatorId]
+            );
+            $isResearchTeamMember = (int) Database::scalar(
+                'SELECT COUNT(*) FROM application_team_members
+                 WHERE application_id = ? AND user_id = ? AND status = "accepted"',
+                [$appId, $evaluatorId]
+            );
+            $isPi = (int) Database::scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE id = ? AND pi_user_id = ?',
+                [$appId, $evaluatorId]
+            );
+            if ($eligible !== 1 || $isResearchTeamMember > 0 || $isPi > 0) {
+                Session::flash('error', "Evaluator {$evaluatorId} is unavailable, not qualified, or has a conflict with this research team.");
+                redirect('index.php?action=application_view&id=' . $appId);
+            }
+        }
+
         Database::transaction(function () use ($appId, $evaluators) {
             Database::run('UPDATE evaluator_assignments SET is_active = 0, status = "cancelled" WHERE application_id = ? AND assignment_level = "university" AND is_active = 1', [$appId]);
             
             foreach ($evaluators as $evalId) {
-                // UNIQUE(application_id, evaluator_user_id): reuse an existing row
-                // (e.g. the same person evaluated at college level) instead of
-                // inserting a duplicate, and mark it as a university assignment.
+                // Assignment rows are unique per evaluator AND stage.
                 EvaluationModel::assign($appId, (int) $evalId, Auth::id(), null, 'university');
             }
         });
@@ -127,7 +164,9 @@ final class UniversityEvaluationController
 
         // Authorization: only an actual assigned evaluator may submit (§7).
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+            'SELECT * FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "university"
+               AND is_active = 1 AND status = "accepted"',
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
@@ -137,11 +176,36 @@ final class UniversityEvaluationController
 
         // Prevent duplicate university submissions by the same evaluator (§7).
         $already = Database::scalar(
-            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND evaluator_user_id = ? AND evaluation_type = "university" AND status = "submitted"',
-            [$appId, Auth::id()]
+            'SELECT COUNT(*) FROM evaluations
+             WHERE assignment_id = ? AND evaluator_user_id = ? AND evaluation_type = "proposal" AND status = "submitted"',
+            [(int) $assignment['id'], Auth::id()]
         );
         if ((int) $already > 0) {
             Session::flash('error', 'You have already submitted your university evaluation for this application.');
+            redirect('index.php?action=my_evaluations');
+        }
+
+        // Start the university evaluation stage only after every active
+        // university evaluator has accepted their own assignment.
+        $app = ApplicationModel::find($appId);
+        if (($app['status_code'] ?? '') === 'UNIV_EVAL_ASSIGNED') {
+            $notAccepted = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments
+                 WHERE application_id = ? AND assignment_level = "university"
+                   AND is_active = 1 AND status <> "accepted"',
+                [$appId]
+            );
+            if ($notAccepted === 0) {
+                WorkflowService::fire($app, 'research_application', 'Univ evaluator accepts', null);
+                $app = ApplicationModel::find($appId);
+                if (($app['status_code'] ?? '') === 'UNIV_EVAL_ACCEPTED') {
+                    WorkflowService::fire($app, 'research_application', 'Start university evaluation', null);
+                }
+            }
+        }
+        $app = ApplicationModel::find($appId);
+        if (($app['status_code'] ?? '') !== 'UNIV_UNDER_EVALUATION') {
+            Session::flash('error', 'University evaluation has not been formally started. Ensure all assigned evaluators have accepted.');
             redirect('index.php?action=my_evaluations');
         }
 

@@ -14,16 +14,32 @@ final class DecisionController
 {
     public static function finalizeDecision(): void
     {
-        Gate::authorize('research.manage'); // Assuming Director or authorized body
+        Gate::authorize('research.manage');
         Csrf::verifyRequest();
         
         $appId = (int) ($_POST['application_id'] ?? 0);
-        $decision = (string) ($_POST['decision'] ?? '');
+        $decision = (string) ($_POST['decision'] ?? ''); // 'accepted', 'not_accepted', 'further_review'
+        $justification = trim((string) ($_POST['justification'] ?? ''));
         
-        // Finalize official decision
-        // ... (Logic to update application status and record official decision)
+        if (!in_array($decision, ['accepted', 'not_accepted', 'further_review'], true)) {
+            Session::flash('error', 'Invalid decision.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+
+        Database::transaction(function () use ($appId, $decision, $justification) {
+            Database::insert('university_decisions', [
+                'application_id' => $appId,
+                'decision'       => $decision,
+                'justification'  => $justification,
+                'decided_by'     => Auth::id(),
+                'decided_at'     => date('Y-m-d H:i:s')
+            ]);
+            
+            // Update application status
+            Database::update('research_applications', ['status_code' => strtoupper($decision)], 'id = ?', [$appId]);
+        });
         
-        Session::flash('success', 'Official decision finalized.');
+        Session::flash('success', 'Official university decision recorded: ' . ucfirst($decision));
         redirect('index.php?action=application_view&id=' . $appId);
     }
 }

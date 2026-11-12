@@ -270,6 +270,7 @@ final class EvaluationModel
 
     public static function createEvaluation(array $data): int
     {
+        // Must include rubric_template_version_id
         return Database::insert('evaluations', $data);
     }
 

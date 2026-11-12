@@ -100,8 +100,8 @@ final class ApplicationController
         }
 
         $call = CallModel::find((int) $clean['call_id']);
-        if ($call === null || !in_array($call['status'], ['published', 'open'], true)) {
-            Session::flash('error', 'The selected call is not open for applications.');
+        if ($call === null || !\App\Core\DeadlineHelper::isCallOpen($call)) {
+            Session::flash('error', 'The selected call is not currently open for applications.');
             redirect('index.php?action=calls_public');
         }
         if ($id === 0) {

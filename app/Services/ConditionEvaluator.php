@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Core\Database;
+use App\Core\Settings;
 
 /**
  * Resolves workflow transition conditions (spec §96).
@@ -31,7 +32,7 @@ final class ConditionEvaluator
             'committee_wants_revision'=> self::committeeDecision($entityId, ['revision_required'], 'The university research committee has not requested a revision.'),
             'agreement_signed'        => self::agreementSigned($entityType, $entityId),
             'budget_recorded'         => self::budgetRecorded($entityType, $entityId),
-            default                   => [true, null], // unknown condition: do not block
+            default                   => [false, 'Unsupported workflow condition: ' . $key . '. Transition blocked until the condition is implemented.'],
         };
     }
 
@@ -61,13 +62,19 @@ final class ConditionEvaluator
         if ($entityType !== 'research_application') {
             return [true, null];
         }
-        $avgScore = (float) Database::scalar(
-            'SELECT AVG(weighted_score) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
+        $avgScore = Database::scalar(
+            'SELECT AVG(weighted_score) FROM evaluations
+             WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
             [$id]
         );
-        return $avgScore >= 50.0
+        $threshold = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
+        if ($avgScore === null) {
+            return [false, 'No completed college proposal evaluations are available.'];
+        }
+        $score = (float) $avgScore;
+        return $score >= $threshold
             ? [true, null]
-            : [false, 'College evaluation average score is below the 50% pass threshold (current average: ' . round($avgScore, 2) . '%).'];
+            : [false, 'College proposal score is below the configured passing threshold (' . $threshold . '/100; current average: ' . round($score, 2) . ').'];
     }
 
     private static function univEvaluationsComplete(string $entityType, int $id): array
@@ -75,15 +82,18 @@ final class ConditionEvaluator
         if ($entityType !== 'research_application') {
             return [true, null];
         }
-        // Assuming institution policy sets required evaluators for university review
-        $required = 3; 
+        $required = max(1, Settings::int('university_evaluators_default', 1));
         $done = (int) Database::scalar(
-            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "university"',
+            'SELECT COUNT(DISTINCT e.evaluator_user_id)
+             FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"',
             [$id]
         );
         return $done >= $required
             ? [true, null]
-            : [false, 'Required university-level evaluations not complete (' . $done . '/' . $required . ').'];
+            : [false, 'Required university-level evaluations are not complete (' . $done . '/' . $required . ').'];
     }
 
     private static function evaluationsComplete(string $entityType, int $id): array

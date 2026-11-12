@@ -12,6 +12,7 @@ $navMap = [
     'director_dashboard'   => ['Director Dashboard', 'research.manage'],
     'applications'   => ['Research', 'research.view'],
     'themes'         => ['Themes', 'research.manage'],
+    'rubrics'        => ['Evaluation Rubrics', 'research.manage'],
     'ethics'         => ['Ethics', 'ethics.view'],
     'projects'       => ['Projects', 'project.view'],
     'calls_public'   => ['Calls', 'research.create'],
@@ -78,6 +79,7 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
         <a href="<?= e(url('action=' . $navAction)) ?>" class="<?= $currentAction === $navAction
           || ($navAction === 'applications' && in_array($currentAction, ['application_view', 'application_form', 'calls'], true))
           || ($navAction === 'my_evaluations' && in_array($currentAction, ['evaluation_form', 'evaluation_view', 'univ_evaluation_form'], true))
+          || ($navAction === 'rubrics' && in_array($currentAction, ['rubric_save'], true))
           || ($navAction === 'ethics' && str_starts_with($currentAction, 'ethics'))
           || ($navAction === 'repository' && str_starts_with($currentAction, 'repository'))
           || ($navAction === 'users' && str_starts_with($currentAction, 'user'))

@@ -29,7 +29,7 @@ final class DirectorDashboardController
             'agreementsPending' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued","awaiting_signature")'),
             'activeProjectsAttention' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code IN ("ACTIVE", "PROGRESS_MONITORING")'),
             'reportingStats' => MonthlyReportingService::getStats(),
-            'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports WHERE status IN ("submitted","approved")'),
+            'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports WHERE status != "approved" AND period_end < date("now")'),
         ];
 
         // 2. Priority Action Center - Proposals awaiting committee assignment
@@ -155,7 +155,7 @@ final class DirectorDashboardController
             'awaitingPreparation' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code IN ("APPROVED","FUNDED") AND id NOT IN (SELECT application_id FROM research_agreements)'),
             'awaitingSignature' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued")'),
             'awaitingActivation' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "APPROVED"'),
-            'activeProjects' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "ACTIVE"'),
+            'activeProjects' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code IN ("ACTIVE", "PROGRESS_MONITORING")'),
             'extensionRequests' => $scalar('SELECT COUNT(*) FROM research_extension_requests WHERE status = "pending"'),
             'amendmentRequests' => $scalar('SELECT COUNT(*) FROM budget_revisions WHERE status = "pending"'),
             'awaitingFinalReport' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "APPROVED"'),

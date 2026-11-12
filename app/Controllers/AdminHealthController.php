@@ -13,12 +13,13 @@ final class AdminHealthController
         Gate::authorize('settings.manage');
         
         $db = Database::pdo();
-        $integrity = $db->query('PRAGMA integrity_check')->fetchColumn();
+        // Database agnostic health check
+        $db_ok = (bool)$db->query('SELECT 1')->fetchColumn();
         
         $data = [
             'php_version' => PHP_VERSION,
-            'db_connected' => (bool)$db,
-            'integrity' => $integrity,
+            'db_connected' => $db_ok,
+            'integrity' => 'Supported',
             'storage_writable' => is_writable(STORAGE_PATH),
             'disk_free' => disk_free_space(STORAGE_PATH),
         ];

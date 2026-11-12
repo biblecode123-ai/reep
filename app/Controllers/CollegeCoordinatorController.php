@@ -48,7 +48,7 @@ final class CollegeCoordinatorController
             'activeProjects' => $scalar(
                 'SELECT COUNT(*) FROM research_projects p
                  JOIN research_applications a ON a.id = p.application_id
-                 WHERE a.college_id = ? AND p.status_code = "ACTIVE"',
+                 WHERE a.college_id = ? AND p.status_code IN ("ACTIVE", "PROGRESS_MONITORING")',
                 [$collegeId]
             ),
             'reportsSubmitted' => $scalar(

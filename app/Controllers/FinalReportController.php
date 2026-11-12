@@ -540,6 +540,30 @@ final class FinalReportController
         redirect('index.php?action=final_report_view&id=' . $reportId);
     }
 
+    private static function eligibleEvaluators(array $report, string $level): array
+    {
+        $sql = 'SELECT u.id, u.full_name, u.email, u.college_id
+                FROM users u
+                JOIN user_roles ur ON ur.user_id = u.id
+                JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
+                WHERE u.status = "active" AND u.id <> ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM research_project_members pm
+                    WHERE pm.project_id = ? AND pm.user_id = u.id AND pm.status = "active"
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM project_evaluator_assignments pea
+                    WHERE pea.final_report_id = ? AND pea.evaluator_user_id = u.id AND pea.assignment_level = ?
+                  )';
+        $params = [(int) $report['pi_user_id'], (int) $report['project_id'], (int) $report['id'], $level];
+        if ($level === 'college') {
+            $sql .= ' AND u.college_id = ?';
+            $params[] = (int) $report['college_id'];
+        }
+        $sql .= ' ORDER BY u.full_name';
+        return Database::all($sql, $params);
+    }
+
     public static function view(): void
     {
         Gate::authorize('research.view');
@@ -566,6 +590,18 @@ final class FinalReportController
         }
         $assignments = FinalReportModel::assignments($reportId);
         $documentUrl = url('download.php?id=' . (int) $report['document_id']);
+        $eligibleCollegeEvaluators = $isCoordinator
+            ? self::eligibleEvaluators($report, 'college')
+            : [];
+        $eligibleUniversityEvaluators = $isDirector
+            ? self::eligibleEvaluators($report, 'university')
+            : [];
+        $myAssignments = array_values(array_filter($assignments, static fn(array $a): bool => (int) $a['evaluator_user_id'] === $userId));
+        $canSubmitRevision = $isPi && in_array($report['status'], ['college_revision_required','university_revision_required'], true);
+        $canAssignCollege = $isCoordinator && in_array($report['status'], ['submitted_to_college','college_evaluation'], true);
+        $canForward = $isCoordinator && $report['status'] === 'college_passed';
+        $canAssignUniversity = $isDirector && in_array($report['status'], ['college_passed','university_revision_required'], true);
+        $canDecide = $isDirector && $report['status'] === 'university_passed';
         include APP_PATH . '/views/research/project_final_report_view.php';
     }
 }

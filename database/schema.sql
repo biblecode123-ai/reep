@@ -399,7 +399,7 @@ CREATE TABLE research_calls (
     budget_currency                 CHAR(3) NOT NULL DEFAULT 'ETB',
     max_applications_per_researcher INT NULL DEFAULT 1,
     evaluation_mode                 ENUM('open','single_blind','double_blind') NOT NULL DEFAULT 'single_blind',
-    required_evaluators             INT NULL DEFAULT 2,         -- POLICY DECISION WF-2 default
+    required_evaluators             INT NULL DEFAULT 1,         -- institutional default: one college evaluator
     status                          ENUM('draft','published','open','closed','under_evaluation','completed','archived') NOT NULL DEFAULT 'draft',
     published_at                    DATETIME NULL,
     closed_at                       DATETIME NULL,

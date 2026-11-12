@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+// Final master-workflow verification suite.
+
 use App\Core\Database;
 use App\Core\DeadlineHelper;
 use App\Core\Settings;

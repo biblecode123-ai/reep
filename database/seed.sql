@@ -551,6 +551,8 @@ INSERT INTO system_settings (setting_key, setting_value, setting_group, value_ty
 ('college_report_passing_score','50',                                   'research',     'decimal', 'College completed report passing threshold out of 100'),
 ('university_proposal_passing_score','50',                              'research',     'decimal', 'University proposal passing threshold out of 100'),
 ('university_report_passing_score','50',                                'research',     'decimal', 'University completed report passing threshold out of 100'),
+('monthly_report_due_day',      '5',                                    'research',     'integer', 'Calendar day on which the previous monthly report becomes overdue'),
+('monthly_report_reminder_days','3',                                    'research',     'integer', 'Days before monthly report due date for reminders'),
 ('budget_currency',            'ETB',                                  'budget',       'string',  'Budget currency code'),
 ('fiscal_year_start_month',    '7',                                    'general',      'integer', 'Ethiopian fiscal year start month'),
 ('timezone',                   'Africa/Addis_Ababa',                   'general',      'string',  'Application timezone');

@@ -578,12 +578,13 @@ final class FinalReportController
         $isPi = (int) $report['pi_user_id'] === $userId;
         $isTeam = self::isProjectTeamMember((int) $report['project_id'], $userId);
         $isCoordinator = Gate::hasRole('college_coordinator') && (int) (Auth::user()['college_id'] ?? 0) === (int) $report['college_id'];
-        $isDirector = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isDirector = Gate::hasRole('rpee_director');
         $userAssignment = FinalReportModel::assignmentForUser($reportId, $userId);
         $isAssigned = $userAssignment !== null
             && !in_array($userAssignment['status'], ['conflict_declared','declined','cancelled'], true)
             && (int) $userAssignment['is_active'] === 1;
-        if (!$isPi && !$isTeam && !$isCoordinator && !$isDirector && !$isAssigned) {
+        if (!$isPi && !$isTeam && !$isCoordinator && !$isDirectorateOfficer && !$isAssigned) {
             http_response_code(403);
             include APP_PATH . '/views/errors/403.php';
             return;

@@ -63,8 +63,10 @@ final class ConditionEvaluator
             return [true, null];
         }
         $avgScore = Database::scalar(
-            'SELECT AVG(weighted_score) FROM evaluations
-             WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
+            'SELECT AVG(e.weighted_score) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"',
             [$id]
         );
         $threshold = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
@@ -82,18 +84,24 @@ final class ConditionEvaluator
         if ($entityType !== 'research_application') {
             return [true, null];
         }
-        $required = max(1, Settings::int('university_evaluators_default', 1));
+        $required = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments
+             WHERE application_id = ? AND assignment_level = "university"
+               AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
+            [$id]
+        );
         $done = (int) Database::scalar(
-            'SELECT COUNT(DISTINCT e.evaluator_user_id)
+            'SELECT COUNT(DISTINCT e.assignment_id)
              FROM evaluations e
              JOIN evaluator_assignments ea ON ea.id = e.assignment_id
              WHERE e.application_id = ? AND e.status = "submitted"
-               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"',
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"
+               AND ea.is_active = 1 AND ea.status = "completed"',
             [$id]
         );
-        return $done >= $required
+        return $required > 0 && $done >= $required
             ? [true, null]
-            : [false, 'Required university-level evaluations are not complete (' . $done . '/' . $required . ').'];
+            : [false, 'University evaluation submissions are incomplete (' . $done . '/' . $required . ' active assignments completed).'];
     }
 
     private static function evaluationsComplete(string $entityType, int $id): array
@@ -104,7 +112,7 @@ final class ConditionEvaluator
         $app = Database::one('SELECT call_id, status_code, revision_submitted_at FROM research_applications WHERE id = ?', [$id]);
         $required = (int) (Database::scalar(
             'SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]
-        ) ?? 2);
+        ) ?? Settings::int('college_evaluators_default', 1));
         // After a revision only evaluations submitted for the NEW version count,
         // so a stale round-1 evaluation can never satisfy re-evaluation (§25).
         if ($app['revision_submitted_at'] !== null

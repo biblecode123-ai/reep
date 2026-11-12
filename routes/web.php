@@ -124,6 +124,7 @@ return [
     'project_milestone_add' => [\App\Controllers\ProjectController::class, 'addMilestone', 'project.activate'],
     'project_milestone_update' => [\App\Controllers\ProjectController::class, 'updateMilestone', 'project.report'],
     'project_report_submit' => [\App\Controllers\ProjectController::class, 'submitReport', 'project.report'],
+    'monthly_report_submit' => [\App\Controllers\MonthlyReportController::class, 'submit', 'project.report'],
     'project_report_review' => [\App\Controllers\ProjectController::class, 'reviewReport', 'research.screen'],
 
     // Completed research report: independent college and university evaluation.

@@ -1,0 +1,42 @@
+name: PHP syntax checks
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Lint changed PHP files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$GITHUB_BASE_REF" --depth=1
+            changed_files="$(git diff --name-only --diff-filter=ACMR "origin/$GITHUB_BASE_REF...HEAD" -- '*.php')"
+          else
+            changed_files="$(git diff --name-only --diff-filter=ACMR HEAD^ HEAD -- '*.php')"
+          fi
+          if [ -z "$changed_files" ]; then
+            echo "No changed PHP files to lint."
+            exit 0
+          fi
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            php -l "$file"
+          done <<< "$changed_files"

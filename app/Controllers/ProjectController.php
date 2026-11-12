@@ -165,12 +165,23 @@ final class ProjectController
             Session::flash('error', 'Project not found.');
             redirect('index.php?action=projects');
         }
+        // Entity-level authorization: project.view alone must not expose
+        // every project's confidential progress, budget, and attachments.
         $isPi = (int) $project['pi_user_id'] === Auth::id();
         $isMember = $isPi || ProjectModel::isMember($id, Auth::id());
-        $canManage = Gate::allows('research.manage', 'project.activate');
-        if (!$isMember && !$canManage && Gate::denies('project.view')) {
-            Session::flash('error', 'Not authorized.');
-            redirect('index.php');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isSameCollegeCoordinator = $isCoordinator
+            && (int) (Auth::user()['college_id'] ?? 0) > 0
+            && (int) (Auth::user()['college_id'] ?? 0) === (int) $project['college_id'];
+        // Technical system administrators and committee reviewers do not
+        // automatically receive institution-wide project access.
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isInstitutionalManager = $isDirectorateOfficer
+            && (Gate::allows('research.manage') || Gate::allows('project.activate'));
+        if (!$isMember && !$isSameCollegeCoordinator && !$isInstitutionalManager) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
         }
         $members = ProjectModel::members($id);
         $milestones = ProjectModel::milestones($id);

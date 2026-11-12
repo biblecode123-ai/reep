@@ -362,11 +362,11 @@ final class ScreeningController
                 if (($app['status_code'] ?? '') === 'EVALUATOR_ASSIGNMENT_PENDING') {
                     [$ok, $error] = WorkflowService::fire($app, 'research_application', 'Assign evaluators', null);
                     if (!$ok) {
-                        throw new \\RuntimeException($error ?? 'Could not advance the college evaluation workflow.');
+                        throw new \RuntimeException($error ?? 'Could not advance the college evaluation workflow.');
                     }
                 }
             });
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             Session::flash('error', $e->getMessage());
             redirect('index.php?action=application_view&id=' . $id);
         }

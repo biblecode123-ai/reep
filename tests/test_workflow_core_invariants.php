@@ -5,6 +5,8 @@ use App\Core\Database;
 use App\Core\DeadlineHelper;
 use App\Core\Settings;
 use App\Models\CallModel;
+use App\Models\RubricModel;
+use App\Services\RubricScoringService;
 use App\Services\ConditionEvaluator;
 
 require __DIR__ . '/bootstrap.php';
@@ -73,6 +75,73 @@ foreach ($workflowConditions as $key) {
         'configured workflow condition is implemented: ' . $key,
         !is_string($error) || !str_starts_with($error, 'Unsupported workflow condition:')
     );
+}
+
+$validRubric = [
+    ['name' => 'Criterion A', 'max_points' => 40, 'indicators' => [
+        ['name' => 'Indicator A1', 'max_points' => 15],
+        ['name' => 'Indicator A2', 'max_points' => 25],
+    ]],
+    ['name' => 'Criterion B', 'max_points' => 60, 'indicators' => [
+        ['name' => 'Indicator B1', 'max_points' => 30],
+        ['name' => 'Indicator B2', 'max_points' => 30],
+    ]],
+];
+$check('complete indicator rubric with 100 points is valid', RubricModel::validateDefinition($validRubric) === []);
+$badTotal = $validRubric;
+$badTotal[1]['max_points'] = 59;
+$check('rubric criterion totals other than 100 are rejected', RubricModel::validateDefinition($badTotal) !== []);
+$badIndicators = $validRubric;
+$badIndicators[0]['indicators'][0]['max_points'] = 14;
+$check('indicator maxima must equal their criterion maximum', RubricModel::validateDefinition($badIndicators) !== []);
+$missingIndicators = $validRubric;
+$missingIndicators[0]['indicators'] = [];
+$check('criteria without indicators are rejected', RubricModel::validateDefinition($missingIndicators) !== []);
+$duplicateIndicators = $validRubric;
+$duplicateIndicators[0]['indicators'][1]['name'] = 'Indicator A1';
+$check('duplicate indicator names within a criterion are rejected', RubricModel::validateDefinition($duplicateIndicators) !== []);
+
+$rubricFixture = [
+    'criteria' => [
+        ['indicators' => [
+            ['id' => 101, 'name' => 'Indicator one', 'max_points' => 3, 'is_required' => 1],
+            ['id' => 102, 'name' => 'Indicator two', 'max_points' => 2, 'is_required' => 1],
+        ]],
+    ],
+];
+$validScores = RubricScoringService::validate($rubricFixture, ['score_101' => '2.5', 'score_102' => '2'], true);
+$check('indicator scores accept valid raw points and total them', $validScores['errors'] === [] && abs($validScores['total'] - 4.5) < 0.001);
+$missingScores = RubricScoringService::validate($rubricFixture, ['score_101' => '2.5'], true);
+$check('submission requires every required indicator score', $missingScores['errors'] !== []);
+$excessScores = RubricScoringService::validate($rubricFixture, ['score_101' => '3.1', 'score_102' => '2'], true);
+$check('indicator scores above their individual maximum are rejected', $excessScores['errors'] !== []);
+$schemaHasRubrics = (int) Database::scalar(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('rubric_templates','rubric_criteria','rubric_indicators','rubric_indicator_scores')"
+);
+$check('SQLite schema contains all versioned rubric tables', $schemaHasRubrics === 4);
+$evaluationColumns = Database::all("PRAGMA table_info(evaluations)");
+$evaluationColumnNames = array_column($evaluationColumns, 'name');
+$check('evaluations retain a rubric version and immutable snapshot', in_array('rubric_template_id', $evaluationColumnNames, true) && in_array('rubric_snapshot', $evaluationColumnNames, true));
+
+$seedOutput = [];
+$seedExit = 1;
+exec('php ' . escapeshellarg(BASE_PATH . '/scripts/seed_institutional_rubrics.php'), $seedOutput, $seedExit);
+$check('all four master-prompt rubric versions seed successfully', $seedExit === 0);
+foreach (array_keys(RubricModel::TYPES) as $rubricType) {
+    $activeRubric = RubricModel::activeFor($rubricType);
+    $check('active rubric exists: ' . $rubricType, $activeRubric !== null);
+    if ($activeRubric !== null) {
+        $criterionTotal = array_sum(array_map(static fn(array $criterion): float => (float) $criterion['max_points'], $activeRubric['criteria']));
+        $indicatorsMatch = true;
+        foreach ($activeRubric['criteria'] as $criterion) {
+            $indicatorTotal = array_sum(array_map(static fn(array $indicator): float => (float) $indicator['max_points'], $criterion['indicators']));
+            if (abs($indicatorTotal - (float) $criterion['max_points']) > 0.001) {
+                $indicatorsMatch = false;
+            }
+        }
+        $check('rubric totals 100: ' . $rubricType, abs($criterionTotal - 100.0) < 0.001);
+        $check('indicator maxima match criteria: ' . $rubricType, $indicatorsMatch);
+    }
 }
 
 $callId = CallModel::create([

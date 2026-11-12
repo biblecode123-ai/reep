@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\Database;
@@ -11,7 +12,9 @@ use App\Core\Session;
 use App\Core\Settings;
 use App\Models\ApplicationModel;
 use App\Models\EvaluationModel;
+use App\Models\RubricModel;
 use App\Services\WorkflowService;
+use App\Services\RubricScoringService;
 
 final class UniversityEvaluationController
 {
@@ -139,18 +142,32 @@ final class UniversityEvaluationController
         Gate::authorize('research.evaluate');
         $appId = (int) ($_GET['application_id'] ?? 0);
         $app = ApplicationModel::find($appId);
-        
+        if ($app === null) {
+            Session::flash('error', 'Application not found.');
+            redirect('index.php?action=my_evaluations');
+        }
+
         $assignment = Database::one(
             'SELECT * FROM evaluator_assignments
              WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "university"
                AND is_active = 1 AND status IN ("assigned","accepted")',
             [$appId, Auth::id()]
         );
-        
         if ($assignment === null) {
             Session::flash('error', 'You are not assigned to evaluate this application.');
             redirect('index.php?action=my_evaluations');
         }
+
+        $round = EvaluationModel::nextRound($appId, Auth::id());
+        $draft = EvaluationModel::findDraft($appId, Auth::id(), $round);
+        $rubric = !empty($draft['rubric_template_id'])
+            ? RubricModel::findById((int) $draft['rubric_template_id'])
+            : RubricModel::activeFor('university_proposal');
+        if ($rubric === null) {
+            Session::flash('error', 'The Research Director must publish a complete University Proposal rubric before evaluation can begin.');
+            redirect('index.php?action=my_evaluations');
+        }
+        $draftScores = $draft ? RubricScoringService::scoresForEvaluation((int) $draft['id']) : [];
 
         include APP_PATH . '/views/research/university_evaluation_form.php';
     }
@@ -160,9 +177,12 @@ final class UniversityEvaluationController
         Gate::authorize('research.evaluate');
         Csrf::verifyRequest();
         $appId = (int) ($_POST['application_id'] ?? 0);
-        $recBudget = (float) ($_POST['recommended_budget'] ?? 0);
+        $app = ApplicationModel::find($appId);
+        if ($app === null) {
+            Session::flash('error', 'Application not found.');
+            redirect('index.php?action=my_evaluations');
+        }
 
-        // Authorization: only an actual assigned evaluator may submit (§7).
         $assignment = Database::one(
             'SELECT * FROM evaluator_assignments
              WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "university"
@@ -170,24 +190,57 @@ final class UniversityEvaluationController
             [$appId, Auth::id()]
         );
         if ($assignment === null) {
-            Session::flash('error', 'You are not assigned to evaluate this application.');
+            Session::flash('error', 'You are not assigned to evaluate this application or have not accepted the assignment.');
             redirect('index.php?action=my_evaluations');
         }
 
-        // Prevent duplicate university submissions by the same evaluator (§7).
-        $already = Database::scalar(
+        $already = (int) Database::scalar(
             'SELECT COUNT(*) FROM evaluations
              WHERE assignment_id = ? AND evaluator_user_id = ? AND evaluation_type = "proposal" AND status = "submitted"',
             [(int) $assignment['id'], Auth::id()]
         );
-        if ((int) $already > 0) {
+        if ($already > 0) {
             Session::flash('error', 'You have already submitted your university evaluation for this application.');
             redirect('index.php?action=my_evaluations');
         }
 
-        // Start the university evaluation stage only after every active
-        // university evaluator has accepted their own assignment.
-        $app = ApplicationModel::find($appId);
+        $round = EvaluationModel::nextRound($appId, Auth::id());
+        $draft = EvaluationModel::findDraft($appId, Auth::id(), $round);
+        $rubric = !empty($draft['rubric_template_id'])
+            ? RubricModel::findById((int) $draft['rubric_template_id'])
+            : RubricModel::activeFor('university_proposal');
+        if ($rubric === null) {
+            Session::flash('error', 'No published University Proposal rubric is available.');
+            redirect('index.php?action=my_evaluations');
+        }
+        $validated = RubricScoringService::validate($rubric, $_POST, true);
+        if ($validated['errors'] !== []) {
+            Session::flash('error', implode(' ', $validated['errors']));
+            redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
+        }
+
+        $recBudgetRaw = $_POST['recommended_budget'] ?? '';
+        $budgetJustification = trim((string) ($_POST['budget_justification'] ?? ''));
+        if (!is_numeric($recBudgetRaw) || (float) $recBudgetRaw < 0 || $budgetJustification === '') {
+            Session::flash('error', 'Enter a valid non-negative recommended budget and its justification.');
+            redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
+        }
+        $recBudget = (float) $recBudgetRaw;
+        $strengths = trim((string) ($_POST['strengths'] ?? ''));
+        $weaknesses = trim((string) ($_POST['weaknesses'] ?? ''));
+        $overall = trim((string) ($_POST['overall_comment'] ?? ''));
+        if ($strengths === '' || $weaknesses === '' || $overall === '') {
+            Session::flash('error', 'Strengths, weaknesses, and the overall evaluation summary are required.');
+            redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
+        }
+        $recommendation = (string) ($_POST['recommendation'] ?? '');
+        if (!in_array($recommendation, ['accept', 'accept_with_revision', 'major_revision', 'reject'], true)) {
+            Session::flash('error', 'Select a final university evaluation recommendation.');
+            redirect('index.php?action=univ_evaluation_form&application_id=' . $appId);
+        }
+
+        // The university evaluation stage starts only after all assigned
+        // university evaluators have accepted their own assignments.
         if (($app['status_code'] ?? '') === 'UNIV_EVAL_ASSIGNED') {
             $notAccepted = (int) Database::scalar(
                 'SELECT COUNT(*) FROM evaluator_assignments
@@ -209,25 +262,60 @@ final class UniversityEvaluationController
             redirect('index.php?action=my_evaluations');
         }
 
-        Database::transaction(function () use ($appId, $recBudget, $assignment) {
-            EvaluationModel::createEvaluation([
-                'application_id'    => $appId,
-                'assignment_id'     => (int) $assignment['id'],
-                'evaluator_user_id' => Auth::id(),
-                'evaluation_type'   => 'proposal',
-                'status'            => 'submitted',
-                'submitted_at'      => date('Y-m-d H:i:s')
+        $weighted = $validated['total'];
+        $evaluationId = Database::transaction(function () use (
+            $appId, $assignment, $draft, $round, $rubric, $validated, $weighted,
+            $recBudget, $budgetJustification, $recommendation
+        ): int {
+            if ($draft === null) {
+                $evaluationId = EvaluationModel::createEvaluation([
+                    'application_id' => $appId,
+                    'assignment_id' => (int) $assignment['id'],
+                    'rubric_template_id' => (int) $rubric['id'],
+                    'rubric_snapshot' => RubricModel::snapshot($rubric),
+                    'evaluator_user_id' => Auth::id(),
+                    'evaluation_type' => 'proposal',
+                    'evaluation_round' => $round,
+                    'status' => 'draft',
+                ]);
+            } else {
+                $evaluationId = (int) $draft['id'];
+                if (empty($draft['rubric_template_id'])) {
+                    EvaluationModel::updateEvaluation($evaluationId, [
+                        'rubric_template_id' => (int) $rubric['id'],
+                        'rubric_snapshot' => RubricModel::snapshot($rubric),
+                    ]);
+                }
+            }
+
+            RubricScoringService::replaceScores($evaluationId, $validated['scores']);
+            EvaluationModel::updateEvaluation($evaluationId, [
+                'recommendation' => $recommendation,
+                'weighted_score' => $weighted,
+                'max_score' => 100,
+                'strengths' => $strengths,
+                'weaknesses' => $weaknesses,
+                'overall_comment' => $overall,
+                'status' => 'submitted',
+                'submitted_at' => date('Y-m-d H:i:s'),
             ]);
 
             Database::insert('university_budget_recommendations', [
                 'application_id' => $appId,
-                'evaluator_id'   => Auth::id(),
-                'amount'         => $recBudget
+                'evaluator_id' => Auth::id(),
+                'amount' => $recBudget,
+                'justification' => $budgetJustification,
             ]);
-
             EvaluationModel::setAssignmentStatus((int) $assignment['id'], 'completed');
+            return $evaluationId;
         });
-        
+
+        Audit::log('university.evaluation_submitted', 'research_application', $appId, null, [
+            'evaluation_id' => $evaluationId,
+            'score' => $weighted,
+            'rubric_version' => (int) $rubric['version'],
+        ]);
+
         $required = (int) Database::scalar(
             'SELECT COUNT(*) FROM evaluator_assignments
              WHERE application_id = ? AND assignment_level = "university"
@@ -255,8 +343,8 @@ final class UniversityEvaluationController
                 Session::flash('warning', $transitionError);
             }
         }
-        
-        Session::flash('success', 'University evaluation submitted.');
+
+        Session::flash('success', 'University indicator-level evaluation submitted and locked.');
         redirect('index.php?action=my_evaluations');
     }
 }

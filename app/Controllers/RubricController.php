@@ -3,56 +3,64 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
+use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
-use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
-use App\Core\Validator;
+use App\Models\RubricModel;
+use InvalidArgumentException;
+use JsonException;
 
-/**
- * Manages versioned evaluation rubric templates (§9).
- */
 final class RubricController
 {
+    private static function authorizeDirector(): void
+    {
+        if (!Gate::hasRole('rpee_director')) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
+        }
+        Gate::authorize('research.manage');
+    }
+
     public static function index(): void
     {
-        Gate::authorize('research.manage');
-        $templates = Database::all('SELECT * FROM rubric_templates WHERE is_active = 1 ORDER BY name');
+        self::authorizeDirector();
+        $templates = RubricModel::allVersions();
+        $rubricTypes = RubricModel::TYPES;
         include APP_PATH . '/views/research/rubrics.php';
     }
 
+    /**
+     * Publish a new immutable version. Editing an existing version in place is
+     * deliberately unsupported; a valid new version supersedes the active one.
+     */
     public static function save(): void
     {
-        Gate::authorize('research.manage');
+        self::authorizeDirector();
         Csrf::verifyRequest();
 
-        // Transactional creation of template, criteria, and indicators
-        Database::transaction(function () {
-            $templateId = Database::insert('rubric_templates', [
-                'name'    => $_POST['name'],
-                'version' => (int) ($_POST['version'] ?? 1)
-            ]);
-
-            $criteria = (array) ($_POST['criteria'] ?? []);
-            foreach ($criteria as $c) {
-                $criterionId = Database::insert('rubric_criteria', [
-                    'template_id' => $templateId,
-                    'name'        => $c['name'],
-                    'max_points'  => (float) $c['max_points']
-                ]);
-
-                foreach ((array) ($c['indicators'] ?? []) as $i) {
-                    Database::insert('rubric_indicators', [
-                        'criterion_id' => $criterionId,
-                        'name'         => $i['name'],
-                        'max_points'   => (float) $i['max_points']
-                    ]);
-                }
+        $type = trim((string) ($_POST['rubric_type'] ?? ''));
+        $json = trim((string) ($_POST['criteria_json'] ?? ''));
+        try {
+            $criteria = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($criteria)) {
+                throw new InvalidArgumentException('Rubric criteria must be a JSON array.');
             }
-        });
+            $templateId = RubricModel::createVersion($type, $criteria, Auth::id());
+        } catch (JsonException $e) {
+            Session::flash('error', 'Invalid rubric JSON: ' . $e->getMessage());
+            redirect('index.php?action=rubrics');
+        } catch (InvalidArgumentException $e) {
+            Session::flash('error', $e->getMessage());
+            redirect('index.php?action=rubrics');
+        }
 
-        Session::flash('success', 'Rubric template saved.');
+        Audit::log('rubric.version_published', 'rubric_template', $templateId, null, [
+            'rubric_type' => $type,
+        ]);
+        Session::flash('success', 'A new immutable rubric version was published and is now active for this stage.');
         redirect('index.php?action=rubrics');
     }
 }

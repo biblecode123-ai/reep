@@ -111,6 +111,14 @@ final class ConditionEvaluator
                AND ea.is_active = 1 AND ea.status = "completed"',
             [$id]
         );
+        if ($required < 1 || $done < $required) {
+            return [false, 'University evaluation submissions are incomplete (' . $done . '/' . $required . ' active assignments completed).'];
+        }
+
+        // This condition verifies completion only. The Research Director
+        // applies the configured passing threshold when recording the final
+        // institutional decision, so a below-threshold result can be rejected
+        // or returned for revision rather than becoming stuck in this stage.
         return $required > 0 && $done >= $required
             ? [true, null]
             : [false, 'University evaluation submissions are incomplete (' . $done . '/' . $required . ' active assignments completed).'];

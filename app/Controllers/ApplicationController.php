@@ -68,6 +68,11 @@ final class ApplicationController
             }
         }
         $openCalls = CallModel::openCalls();
+        $selectedCallId = $app !== null ? (int) $app['call_id'] : $callId;
+        $call = $selectedCallId > 0 ? CallModel::find($selectedCallId) : null;
+        if ($call !== null && !in_array((int) $call['id'], array_map(static fn(array $row): int => (int) $row['id'], $openCalls), true)) {
+            $openCalls[] = $call;
+        }
         $themes = \App\Models\OrgModel::themes();
         $types = \App\Models\OrgModel::types();
         $workPlan = $id ? ApplicationModel::workPlan($id) : [];
@@ -92,7 +97,7 @@ final class ApplicationController
         [$ok, $errors, $clean] = Validator::check($_POST, [
             'title'       => 'required|max:250',
             'call_id'     => 'required|integer',
-            'budget'      => 'numeric',
+            'budget'      => 'required|numeric',
             'requires_ethics' => 'in:yes,no,unsure',
         ]);
         if (!$ok) {

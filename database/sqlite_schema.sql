@@ -939,6 +939,7 @@ CREATE TABLE progress_reports (
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_preport_number UNIQUE (report_number),
+    CONSTRAINT uq_progress_project_period UNIQUE (project_id, reporting_period),
     FOREIGN KEY (project_id) REFERENCES research_projects (id) ON DELETE RESTRICT ON UPDATE CASCADE,
     FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
 );

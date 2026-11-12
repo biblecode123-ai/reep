@@ -564,7 +564,7 @@ final class ScreeningController
         
         // Fire the appropriate workflow transition
         $transition = match ($decision) {
-            'forward_to_university' => 'Forward to university',
+            'forward_to_university' => 'Send to university evaluation',
             'reject_at_college'     => 'College reject',
             'return_for_revision'   => 'Request revision',
         };

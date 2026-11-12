@@ -144,17 +144,23 @@ final class RubricModel
 
     public static function activeFor(string $type): ?array
     {
-        $template = Database::one(
-            'SELECT * FROM rubric_templates WHERE rubric_type = ? AND is_active = 1 ORDER BY version DESC LIMIT 1',
+        $id = Database::scalar(
+            'SELECT id FROM rubric_templates WHERE rubric_type = ? AND is_active = 1 ORDER BY version DESC LIMIT 1',
             [$type]
         );
+        return $id === null ? null : self::findById((int) $id);
+    }
+
+    /** Load an exact version, including archived versions referenced by drafts. */
+    public static function findById(int $id): ?array
+    {
+        $template = Database::one('SELECT * FROM rubric_templates WHERE id = ?', [$id]);
         if ($template === null) {
             return null;
         }
-
         $criteria = Database::all(
             'SELECT * FROM rubric_criteria WHERE template_id = ? ORDER BY sort_order, id',
-            [(int) $template['id']]
+            [$id]
         );
         foreach ($criteria as &$criterion) {
             $criterion['indicators'] = Database::all(

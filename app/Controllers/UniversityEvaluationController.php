@@ -14,9 +14,19 @@ use App\Services\WorkflowService;
 
 final class UniversityEvaluationController
 {
+    private static function authorizeDirectorate(): void
+    {
+        if (!Gate::hasRole('rpee_director') && !Gate::hasRole('rpee_officer')) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
+        }
+        Gate::authorize('research.assign');
+    }
+
     public static function assignEvaluatorsForm(): void
     {
-        Gate::authorize('research.assign');
+        self::authorizeDirectorate();
         $appId = (int) ($_GET['application_id'] ?? 0);
         $app = ApplicationModel::find($appId);
         
@@ -24,19 +34,27 @@ final class UniversityEvaluationController
             Session::flash('error', 'Application not found.');
             redirect('index.php?action=applications');
         }
+        if (($app['status_code'] ?? '') !== 'UNIV_EVAL_ASSIGNMENT_PENDING') {
+            Session::flash('error', 'Only college-endorsed proposals in the university evaluator assignment stage can be assigned.');
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
         
-        $collegeScore = (float) Database::scalar(
-            'SELECT AVG(weighted_score) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
+        $collegeScore = Database::scalar(
+            'SELECT AVG(weighted_score) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"',
             [$appId]
         );
-        
-        if ($collegeScore < 50.0) {
+        $passingScore = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
+
+        if ($collegeScore === null || (float) $collegeScore < $passingScore) {
             Session::flash('error', 'Proposal did not pass college evaluation.');
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
         $evaluators = Database::all('SELECT u.id, u.full_name FROM users u JOIN research_evaluators re ON re.user_id = u.id WHERE re.availability_status = "available"');
-        $assignments = Database::all('SELECT evaluator_user_id FROM evaluator_assignments WHERE application_id = ? AND is_active = 1', [$appId]);
+        $assignments = Database::all('SELECT evaluator_user_id FROM evaluator_assignments WHERE application_id = ? AND assignment_level = "university" AND is_active = 1', [$appId]);
         $assignedIds = array_column($assignments, 'evaluator_user_id');
 
         include APP_PATH . '/views/research/university_evaluator_assignment.php';
@@ -44,7 +62,7 @@ final class UniversityEvaluationController
 
     public static function assignEvaluators(): void
     {
-        Gate::authorize('research.assign');
+        self::authorizeDirectorate();
         Csrf::verifyRequest();
         $appId = (int) ($_POST['application_id'] ?? 0);
         $evaluators = (array) ($_POST['evaluators'] ?? []);
@@ -55,8 +73,15 @@ final class UniversityEvaluationController
             redirect('index.php?action=applications');
         }
 
+        $required = max(1, Settings::int('university_evaluators_default', 1));
+        $evaluators = array_values(array_unique(array_filter(array_map('intval', $evaluators), static fn(int $id): bool => $id > 0)));
+        if (count($evaluators) !== $required) {
+            Session::flash('error', "Assign exactly {$required} university evaluator(s), based on the current Directorate setting.");
+            redirect('index.php?action=application_view&id=' . $appId);
+        }
+
         Database::transaction(function () use ($appId, $evaluators) {
-            Database::run('UPDATE evaluator_assignments SET is_active = 0 WHERE application_id = ?', [$appId]);
+            Database::run('UPDATE evaluator_assignments SET is_active = 0, status = "cancelled" WHERE application_id = ? AND assignment_level = "university" AND is_active = 1', [$appId]);
             
             foreach ($evaluators as $evalId) {
                 // UNIQUE(application_id, evaluator_user_id): reuse an existing row
@@ -79,7 +104,9 @@ final class UniversityEvaluationController
         $app = ApplicationModel::find($appId);
         
         $assignment = Database::one(
-            'SELECT * FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+            'SELECT * FROM evaluator_assignments
+             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = "university"
+               AND is_active = 1 AND status IN ("assigned","accepted")',
             [$appId, Auth::id()]
         );
         
@@ -123,7 +150,7 @@ final class UniversityEvaluationController
                 'application_id'    => $appId,
                 'assignment_id'     => (int) $assignment['id'],
                 'evaluator_user_id' => Auth::id(),
-                'evaluation_type'   => 'university',
+                'evaluation_type'   => 'proposal',
                 'status'            => 'submitted',
                 'submitted_at'      => date('Y-m-d H:i:s')
             ]);
@@ -137,9 +164,12 @@ final class UniversityEvaluationController
             EvaluationModel::setAssignmentStatus((int) $assignment['id'], 'completed');
         });
         
-        $required = 3; 
+        $required = max(1, Settings::int('university_evaluators_default', 1));
         $done = (int) Database::scalar(
-            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "university"',
+            'SELECT COUNT(DISTINCT e.evaluator_user_id) FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"',
             [$appId]
         );
         

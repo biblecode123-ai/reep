@@ -20,7 +20,7 @@ final class UniversityEvaluationController
 {
     private static function authorizeDirectorate(): void
     {
-        if (!Gate::hasRole('rpee_director') && !Gate::hasRole('rpee_officer')) {
+        if (!Gate::hasRole('rpee_director')) {
             http_response_code(403);
             include APP_PATH . '/views/errors/403.php';
             exit;
@@ -116,8 +116,10 @@ final class UniversityEvaluationController
                 'SELECT COUNT(*) FROM research_applications WHERE id = ? AND pi_user_id = ?',
                 [$appId, $evaluatorId]
             );
-            if ($eligible !== 1 || $isResearchTeamMember > 0 || $isPi > 0) {
-                Session::flash('error', "Evaluator {$evaluatorId} is unavailable, not qualified, or has a conflict with this research team.");
+            $conflictWarning = EvaluationModel::detectConflicts($appId, $evaluatorId);
+            if ($eligible !== 1 || $isResearchTeamMember > 0 || $isPi > 0 || $conflictWarning !== null) {
+                Session::flash('error', "Evaluator {$evaluatorId} is unavailable, not qualified, or has a conflict with this research team."
+                    . ($conflictWarning !== null ? ' ' . $conflictWarning : ''));
                 redirect('index.php?action=application_view&id=' . $appId);
             }
         }

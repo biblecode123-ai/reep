@@ -420,15 +420,56 @@ final class ScreeningController
         Csrf::verifyRequest();
         $conflictId = (int) ($_POST['conflict_id'] ?? 0);
         $resolution = (string) ($_POST['resolution'] ?? '');
-        $conflict = Database::one('SELECT c.*, ea.application_id FROM evaluator_conflicts c JOIN evaluator_assignments ea ON ea.id = c.assignment_id WHERE c.id = ?', [$conflictId]);
+        $conflict = Database::one(
+            'SELECT c.*, ea.application_id, ea.evaluator_user_id, ea.status AS assignment_status, ea.is_active,
+                    a.college_id
+             FROM evaluator_conflicts c
+             JOIN evaluator_assignments ea ON ea.id = c.assignment_id
+             JOIN research_applications a ON a.id = ea.application_id
+             WHERE c.id = ?',
+            [$conflictId]
+        );
         if ($conflict === null) {
             Session::flash('error', 'Conflict not found.');
             redirect('index.php');
         }
+        if (!in_array($resolution, ['override', 'reassigned'], true)) {
+            Session::flash('error', 'Select a valid conflict resolution.');
+            redirect('index.php');
+        }
+        $user = Auth::user();
+        $isDirector = Gate::hasRole('rpee_director');
+        $isCoordinator = Gate::hasRole('college_coordinator') && $user !== null
+            && (int) ($user['college_id'] ?? 0) === (int) $conflict['college_id'];
+        if (!$isDirector && !$isCoordinator) {
+            http_response_code(403);
+            include APP_PATH . '/views/errors/403.php';
+            exit;
+        }
+        if ($conflict['resolved'] !== 'open' || $conflict['assignment_status'] !== 'conflict_declared') {
+            Session::flash('error', 'Only an open declared conflict can be resolved.');
+            redirect('index.php?action=application_view&id=' . (int) $conflict['application_id']);
+        }
+
         $resolvedValue = $resolution === 'override' ? 'resolved_override' : 'resolved_reassigned';
-        Database::update('evaluator_conflicts', [
-            'resolved' => $resolvedValue, 'resolved_by' => Auth::id(), 'resolved_at' => date('Y-m-d H:i:s'),
-        ], 'id = ?', [$conflictId]);
+        Database::transaction(function () use ($conflictId, $conflict, $resolvedValue): void {
+            Database::update('evaluator_conflicts', [
+                'resolved' => $resolvedValue,
+                'resolved_by' => Auth::id(),
+                'resolved_at' => date('Y-m-d H:i:s'),
+            ], 'id = ?', [$conflictId]);
+            if ($resolvedValue === 'resolved_override') {
+                Database::update('evaluator_assignments', [
+                    'status' => 'accepted',
+                    'is_active' => 1,
+                ], 'id = ?', [(int) $conflict['assignment_id']]);
+            } else {
+                Database::update('evaluator_assignments', [
+                    'status' => 'cancelled',
+                    'is_active' => 0,
+                ], 'id = ?', [(int) $conflict['assignment_id']]);
+            }
+        });
         Audit::log('evaluator.conflict_resolved', 'research_application', (int) $conflict['application_id'], null, ['resolution' => $resolution]);
         Session::flash('success', 'Conflict marked resolved.');
         redirect('index.php?action=application_view&id=' . (int) $conflict['application_id']);

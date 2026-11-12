@@ -111,9 +111,27 @@ final class ConditionEvaluator
                AND ea.is_active = 1 AND ea.status = "completed"',
             [$id]
         );
-        return $required > 0 && $done >= $required
+        if ($required < 1 || $done < $required) {
+            return [false, 'University evaluation submissions are incomplete (' . $done . '/' . $required . ' active assignments completed).'];
+        }
+
+        // Multiple university evaluator scores are averaged arithmetically.
+        $average = Database::scalar(
+            'SELECT AVG(e.weighted_score)
+             FROM evaluations e
+             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
+             WHERE e.application_id = ? AND e.status = "submitted"
+               AND e.evaluation_type = "proposal" AND ea.assignment_level = "university"
+               AND ea.is_active = 1 AND ea.status = "completed"',
+            [$id]
+        );
+        if ($average === null) {
+            return [false, 'No completed university proposal scores are available.'];
+        }
+        $threshold = max(0.0, min(100.0, (float) Settings::get('university_proposal_passing_score', '50')));
+        return (float) $average >= $threshold
             ? [true, null]
-            : [false, 'University evaluation submissions are incomplete (' . $done . '/' . $required . ' active assignments completed).'];
+            : [false, 'University proposal score is below the configured passing threshold (' . $threshold . '/100; current average: ' . round((float) $average, 2) . ').'];
     }
 
     private static function evaluationsComplete(string $entityType, int $id): array

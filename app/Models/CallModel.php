@@ -46,7 +46,7 @@ final class CallModel
     public static function openCalls(): array
     {
         $calls = Database::all(
-            "SELECT c.*, COALESCE(cthemes.theme_names, th.name) AS theme_name,
+            "SELECT c.*, th.name AS theme_name,
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
@@ -59,7 +59,7 @@ final class CallModel
     public static function find(int $id): ?array
     {
         return Database::one(
-            'SELECT c.*, u.full_name AS created_by_name, COALESCE(cthemes.theme_names, th.name) AS theme_name
+            'SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by
              LEFT JOIN research_themes th ON th.id = c.research_theme_id

@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 require __DIR__ . '/../app/bootstrap.php';
 
-use App\\Core\\Database;
+use App\Core\Database;
 
 $sqlite = Database::isSqlite();
 $exists = $sqlite
@@ -38,7 +38,7 @@ if (!$exists) {
             CONSTRAINT fk_rct_theme FOREIGN KEY (theme_id) REFERENCES research_themes(id) ON DELETE RESTRICT ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
     }
-    echo "Created research_call_themes.\\n";
+    echo "Created research_call_themes.\n";
 }
 
 $legacyRows = Database::all('SELECT id, research_theme_id FROM research_calls WHERE research_theme_id IS NOT NULL');
@@ -48,4 +48,4 @@ foreach ($legacyRows as $row) {
         Database::insert('research_call_themes', ['call_id' => (int) $row['id'], 'theme_id' => (int) $row['research_theme_id']]);
     }
 }
-echo 'Migrated legacy theme associations: ' . count($legacyRows) . "\\n";
+echo 'Migrated legacy theme associations: ' . count($legacyRows) . "\n";

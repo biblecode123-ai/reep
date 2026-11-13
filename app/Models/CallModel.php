@@ -30,7 +30,7 @@ final class CallModel
 
         $total = (int) Database::scalar("SELECT COUNT(*) FROM research_calls c WHERE $whereSql", $params);
         $rows  = Database::all(
-            "SELECT c.*, u.full_name AS created_by_name, COALESCE(cthemes.theme_names, th.name) AS theme_name,
+            "SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name,
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by

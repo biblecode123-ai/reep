@@ -41,7 +41,7 @@ final class DashboardController
             'collegeQueue' => [],
         ];
 
-        if (Gate::allows('research.view') && (Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator'))) {
+        if (Gate::allows('research.view') && (Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator'))) {
             $collegeId = (int) (Auth::user()['college_id'] ?? 0);
             $data['collegeQueue'] = Database::all(
                 'SELECT a.id, a.application_number, a.title, a.status_code, u.full_name AS pi_name
@@ -146,7 +146,7 @@ final class DashboardController
                 'colleges'     => (int) Database::scalar('SELECT COUNT(*) FROM colleges'),
                 'depts'        => (int) Database::scalar('SELECT COUNT(*) FROM departments'),
             ],
-            'roles' => Database::all('SELECT r.name, COUNT(ur.user_id) as cnt FROM roles r LEFT JOIN user_roles ur ON ur.role_id = r.id WHERE r.name IN ("system_admin", "researcher", "college_coordinator", "rpee_director") GROUP BY r.id'),
+            'roles' => Database::all("SELECT r.name, COUNT(ur.user_id) as cnt FROM roles r LEFT JOIN user_roles ur ON ur.role_id = r.id WHERE r.role_type = 'primary' GROUP BY r.id"),
             'recentLogs' => \App\Models\AuditLogModel::paginate([], 1, 10)['logs'],
         ];
         extract($data);

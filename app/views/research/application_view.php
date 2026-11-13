@@ -168,20 +168,25 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
     <div class="card">
       <h2 class="mt0">Evaluations</h2>
       <?php
-        $requiredEvaluators = (int) ($app['required_evaluators'] ?? 2);
-        $assignedCount = count($assignments);
-        $completedCount = 0;
+        $minimumEvaluators = 2;
+        $requiredEvaluators = max($minimumEvaluators, (int) ($app['required_evaluators'] ?? $minimumEvaluators));
+        $assignedEvaluatorIds = [];
+        $completedEvaluatorIds = [];
         foreach ($assignments as $as) {
+            $evaluatorId = (int) ($as['evaluator_user_id'] ?? $as['id']);
+            $assignedEvaluatorIds[$evaluatorId] = true;
             if ($as['status'] === 'completed') {
-                $completedCount++;
+                $completedEvaluatorIds[$evaluatorId] = true;
             }
         }
-        $progressPercent = $requiredEvaluators > 0 ? min(100, round(($completedCount / $requiredEvaluators) * 100)) : 0;
+        $assignedCount = count($assignedEvaluatorIds);
+        $completedCount = count($completedEvaluatorIds);
+        $progressPercent = min(100, round(($completedCount / $minimumEvaluators) * 100));
       ?>
       <div style="margin-bottom:16px;padding:12px;background:var(--bg-tint,#f6f8fa);border-radius:var(--r-md);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <span style="font-weight:600;">Evaluation Progress</span>
-          <span><?= $completedCount ?> / <?= $requiredEvaluators ?> completed</span>
+          <span><?= $completedCount ?> / <?= $minimumEvaluators ?> minimum completed</span>
         </div>
         <div style="height:8px;background:var(--line);border-radius:var(--r-pill);overflow:hidden;">
           <div style="height:100%;background:var(--brand);width:<?= $progressPercent ?>%;transition:width var(--t-med);"></div>
@@ -190,13 +195,17 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
           <div style="margin-top:8px;font-size:13px;color:var(--muted);">
             <?= $requiredEvaluators - $assignedCount ?> evaluator(s) still need to be assigned.
           </div>
-        <?php elseif ($completedCount < $requiredEvaluators): ?>
+        <?php elseif ($completedCount < $minimumEvaluators): ?>
           <div style="margin-top:8px;font-size:13px;color:var(--muted);">
-            <?= $requiredEvaluators - $completedCount ?> evaluation(s) pending.
+            <?= $minimumEvaluators - $completedCount ?> independent evaluation(s) still needed to advance.
+          </div>
+        <?php elseif ($completedCount < $assignedCount): ?>
+          <div style="margin-top:8px;font-size:13px;color:var(--ok);">
+            Minimum met. Additional assigned evaluations may remain pending, but do not block advancement.
           </div>
         <?php else: ?>
           <div style="margin-top:8px;font-size:13px;color:var(--ok);">
-            ✓ All required evaluations completed.
+            Minimum independent evaluations completed.
           </div>
         <?php endif; ?>
       </div>
@@ -263,10 +272,9 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
                   $collegeEvaluators = \App\Core\Database::all(
                     'SELECT u.id, u.full_name, d.name as department_name
                      FROM users u
-                     JOIN user_roles ur ON ur.user_id = u.id
-                     JOIN roles r ON r.id = ur.role_id
+                     JOIN research_evaluators re ON re.user_id = u.id
                      LEFT JOIN departments d ON d.id = u.department_id
-                     WHERE r.name = "evaluator" AND u.status = "active" AND u.college_id = ?
+                     WHERE u.status = "active" AND u.college_id = ?
                      ORDER BY u.full_name',
                     [(int) $app['college_id']]
                   );
@@ -424,12 +432,20 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       <p class="muted" style="margin-bottom:12px;">Record the college-level outcome and forward eligible proposals to university evaluation.</p>
 
       <!-- Evaluation Summary -->
-      <?php if ($evaluations): ?>
+      <?php $scoreCount = 0; $avgScore = 0.0; if ($evaluations): ?>
       <div style="background:var(--bg-soft);padding:12px;border-radius:4px;margin-bottom:16px;">
         <h3 style="margin-top:0;">Consolidated Evaluation Summary</h3>
         <?php
-        $submittedEvals = array_filter($evaluations, fn($e) => $e['status'] === 'submitted');
-        $totalScore = 0;
+        $submittedByEvaluator = [];
+        foreach ($evaluations as $evaluation) {
+          if ($evaluation['status'] !== 'submitted') {
+            continue;
+          }
+          $evaluatorKey = (int) ($evaluation['evaluator_user_id'] ?? $evaluation['assignment_id'] ?? $evaluation['id']);
+          $submittedByEvaluator[$evaluatorKey] = $evaluation;
+        }
+        $submittedEvals = array_values($submittedByEvaluator);
+        $totalScore = 0.0;
         $scoreCount = 0;
         $recommendations = [];
         foreach ($submittedEvals as $ev) {
@@ -441,11 +457,11 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
             $recommendations[] = $ev['recommendation'];
           }
         }
-        $avgScore = $scoreCount > 0 ? $totalScore / $scoreCount : 0;
+        $avgScore = $scoreCount > 0 ? $totalScore / $scoreCount : 0.0;
         ?>
         <dl class="kv">
-          <dt>Evaluations submitted</dt><dd><?= count($submittedEvals) ?> / <?= (int) ($app['required_evaluators'] ?? 2) ?> required</dd>
-          <dt>Average weighted score</dt><dd><strong><?= number_format($avgScore, 1) ?></strong> / 100</dd>
+          <dt>Independent evaluations submitted</dt><dd><?= count($submittedEvals) ?> / 2 minimum</dd>
+          <dt>Average weighted score (advisory)</dt><dd><strong><?= number_format($avgScore, 1) ?></strong> / 100</dd>
           <dt>Recommendations</dt><dd>
             <?php if ($recommendations): ?>
               <?php
@@ -458,9 +474,9 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
             <?php endif; ?>
           </dd>
         </dl>
-        <?php if ($scoreCount < (int) ($app['required_evaluators'] ?? 2)): ?>
+        <?php if ($scoreCount < 2): ?>
         <div class="alert alert-warning" style="margin-top:8px;">
-          Not all required evaluations are complete. You may still decide, but consider awaiting all evaluations.
+          At least two independent evaluations must be completed before forwarding. Score thresholds and any additional assigned evaluations are advisory.
         </div>
         <?php endif; ?>
       </div>
@@ -472,10 +488,10 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
         <label>Decision <span class="req">*</span></label>
         <select name="decision" required>
           <option value="">Select decision...</option>
-          <option value="forward_to_university" <?= $scoreCount >= (int) ($app['required_evaluators'] ?? 2) ? '' : 'disabled' ?>>
+          <option value="forward_to_university" <?= $scoreCount >= 2 ? '' : 'disabled' ?>>
             Forward to university evaluation
-            <?php if ($scoreCount < (int) ($app['required_evaluators'] ?? 2)): ?>
-              (requires all evaluations)
+            <?php if ($scoreCount < 2): ?>
+              (requires 2 independent evaluations)
             <?php endif; ?>
           </option>
           <option value="return_for_revision">Return for revision</option>

@@ -48,9 +48,9 @@ echo "\nTest 3: Evaluator assignment eligibility\n";
 $evaluators = Database::all(
     'SELECT u.id, u.full_name, u.college_id, u.department_id 
      FROM users u
-     JOIN user_roles ur ON ur.user_id = u.id
-     JOIN roles r ON r.id = ur.role_id
-     WHERE r.name = "evaluator" AND u.status = "active"
+JOIN user_responsibilities ur ON ur.user_id = u.id
+  JOIN roles r ON r.id = ur.role_id
+  WHERE r.name = "evaluator" AND u.status = "active"
      LIMIT 5'
 );
 

@@ -44,7 +44,14 @@ audit) runs green via `bash scripts/e2e_acceptance.sh`.
 #    — or schema.sql + seed.sql for MySQL — prepares storage/, creates the admin)
 php scripts/install.php
 
-# 2b. EXISTING installs: apply lifecycle schema/workflow additions idempotently
+# 2b. EXISTING installs: convert legacy multi-role grants to one primary category
+#     and separate responsibilities; original memberships are archived for rollback.
+php scripts/migrate_call_themes.php
+php scripts/migrate_role_assignments.php  # idempotent; run before deploying the updated app
+# If the deployment is rolled back, restore the original role links with:
+php scripts/rollback_role_assignments.php
+
+# 2c. Apply lifecycle schema/workflow additions idempotently
 php scripts/migrate_lifecycle.php   # safe to re-run ("nothing to do" when up to date)
 
 # 3a. Quick dev server:
@@ -63,7 +70,7 @@ First login forces a password change (accounts are seeded with `must_change_pass
 
 ### Installer-provided accounts (when you answer "yes" to sample data)
 
-| Account                  | Role                      | Initial password  |
+| Account                  | Account category / responsibility | Initial password  |
 |--------------------------|---------------------------|-------------------|
 | `admin@mwu.edu.et`       | System Administrator      | (chosen at install) |
 | `director@mwu.edu.et`    | RPEE Director             | `Password123!`    |
@@ -78,11 +85,11 @@ First login forces a password change (accounts are seeded with `must_change_pass
 > Change all sample passwords before any real deployment. Sample colleges/departments/users are
 > demonstration data — the system itself ships with zero hardcoded institutional data (Rule 2).
 
-### Comprehensive seeder — one account per role (scripts/seed_roles.php)
+### Comprehensive seeder — account categories and responsibilities (scripts/seed_roles.php)
 
 Run `php scripts/seed_roles.php` after installing. It is idempotent (re-running updates rather than
 duplicates, matched by email) and **resets every account below to the shared demo password
-`Password123!`**. `researcher@mwu.edu.et` also holds the `principal_investigator` role.
+`Password123!`**. Each account gets one of the four primary categories; operational duties are separate responsibilities, while committee membership and evaluator assignments use their dedicated records.
 
 | Account                       | Role                        |
 |-------------------------------|-----------------------------|

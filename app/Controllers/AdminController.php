@@ -34,7 +34,7 @@ final class AdminController
         $p = paginate($result['total'], $page, 20);
         $rows = $result['rows'];
         $colleges = OrgModel::colleges();
-        $roles = Database::all('SELECT * FROM roles WHERE name IN (?, ?, ?, ?) ORDER BY name', ['system_admin', 'rpee_director', 'college_coordinator', 'researcher']);
+        $roles = Database::all("SELECT * FROM roles WHERE role_type = 'primary' ORDER BY id");
         
         // Pass query string for pagination links
         $qs = http_build_query(array_filter([
@@ -54,9 +54,11 @@ final class AdminController
         $id = (int) ($_GET['id'] ?? 0);
         $user = $id > 0 ? UserModel::findById($id) : null;
         $userRoleIds = $id > 0 ? UserModel::roleIdsFor($id) : [];
+        $userResponsibilityIds = $id > 0 ? UserModel::responsibilityIdsFor($id) : [];
         $colleges = OrgModel::colleges();
         $departments = ($user && $user['college_id']) ? OrgModel::departments((int)$user['college_id']) : [];
-        $roles = Database::all('SELECT * FROM roles WHERE name IN (?, ?, ?, ?) ORDER BY name', ['system_admin', 'rpee_director', 'college_coordinator', 'researcher']);
+        $roles = Database::all("SELECT * FROM roles WHERE role_type = 'primary' ORDER BY id");
+        $assignments = Database::all("SELECT * FROM roles WHERE role_type = 'assignment' ORDER BY display_name");
         $errors = [];
         include APP_PATH . '/views/admin/user_form.php';
     }
@@ -100,19 +102,24 @@ final class AdminController
             $data['password_hash'] = password_hash((string) $_POST['password'], PASSWORD_BCRYPT, ['cost' => 12]);
             $data['must_change_password'] = 1;
         }
-        $roleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
+        $roleIds = $id > 0 ? null : [(int) ($_POST['primary_role'] ?? 0)];
+        $responsibilityIds = $id > 0 ? null : array_map('intval', (array) ($_POST['responsibilities'] ?? []));
 
         try {
             if ($id > 0) {
-                UserModel::update($id, $data, $roleIds);
-                Audit::log('user.updated', 'user', $id, null, ['roles' => $roleIds]);
+                UserModel::update($id, $data, $roleIds, $responsibilityIds);
+                Audit::log('user.updated', 'user', $id, null, ['primary_role' => $roleIds, 'responsibilities' => $responsibilityIds]);
                 Session::flash('success', 'User updated.');
             } else {
                 if (empty($_POST['password'])) {
                     Session::flash('error', 'A password is required for new users.');
                     redirect('index.php?action=user_form');
                 }
-                $id = UserModel::create($data, $roleIds);
+                if (($roleIds[0] ?? 0) <= 0 || !Database::scalar("SELECT COUNT(*) FROM roles WHERE id = ? AND role_type = 'primary'", [$roleIds[0]])) {
+                    Session::flash('error', 'Select one valid primary account category.');
+                    redirect('index.php?action=user_form');
+                }
+                $id = UserModel::create($data, $roleIds, $responsibilityIds ?? []);
                 Audit::log('user.created', 'user', $id, null, ['email' => $data['email']]);
                 Session::flash('success', 'User created.');
             }
@@ -134,7 +141,7 @@ final class AdminController
             redirect('index.php?action=users');
         }
 
-        UserModel::update($id, ['status' => 'inactive'], []);
+        UserModel::update($id, ['status' => 'inactive']);
         Audit::log('user.deactivated', 'user', $id);
         Session::flash('success', 'User marked as inactive.');
         redirect('index.php?action=users');
@@ -168,7 +175,9 @@ final class AdminController
             redirect('index.php?action=users');
         }
         $userRoleIds = UserModel::roleIdsFor($id);
-        $roles = Database::all('SELECT * FROM roles WHERE name IN (?, ?, ?, ?) ORDER BY name', ['system_admin', 'rpee_director', 'college_coordinator', 'researcher']);
+        $userResponsibilityIds = UserModel::responsibilityIdsFor($id);
+        $roles = Database::all("SELECT * FROM roles WHERE role_type = 'primary' ORDER BY id");
+        $assignments = Database::all("SELECT * FROM roles WHERE role_type = 'assignment' ORDER BY display_name");
         include APP_PATH . '/views/admin/user_roles.php';
     }
 
@@ -177,11 +186,20 @@ final class AdminController
         Gate::authorize('user.roles');
         Csrf::verifyRequest();
         $id = (int) ($_POST['id'] ?? 0);
-        $roleIds = array_map('intval', (array) ($_POST['roles'] ?? []));
-        UserModel::update($id, [], $roleIds);
+        $roleId = (int) ($_POST['primary_role'] ?? 0);
+        $responsibilityIds = array_map('intval', (array) ($_POST['responsibilities'] ?? []));
+        if (UserModel::findById($id) === null) {
+            Session::flash('error', 'User not found.');
+            redirect('index.php?action=users');
+        }
+        if ($roleId <= 0 || !Database::scalar("SELECT COUNT(*) FROM roles WHERE id = ? AND role_type = 'primary'", [$roleId])) {
+            Session::flash('error', 'Select one valid primary account category.');
+            redirect('index.php?action=user_roles&id=' . $id);
+        }
+        UserModel::update($id, [], [$roleId], $responsibilityIds);
         Gate::flush();
-        Audit::log('user.roles_changed', 'user', $id, null, ['roles' => $roleIds]);
-        Session::flash('success', 'Roles updated.');
+        Audit::log('user.roles_changed', 'user', $id, null, ['primary_role' => $roleId, 'responsibilities' => $responsibilityIds]);
+        Session::flash('success', 'Account category and responsibilities updated.');
         redirect('index.php?action=users');
     }
 

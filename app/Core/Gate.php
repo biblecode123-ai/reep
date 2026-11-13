@@ -14,6 +14,7 @@ final class Gate
 {
     private static ?array $permissionCache = null;
     private static ?array $roleCache = null;
+    private static ?array $responsibilityCache = null;
 
     /** All permissions held by the current user (union of role grants). */
     public static function permissions(): array
@@ -57,16 +58,32 @@ final class Gate
         return in_array($roleName, self::roles(), true);
     }
 
+    public static function responsibilities(): array
+    {
+        if (self::$responsibilityCache !== null) {
+            return self::$responsibilityCache;
+        }
+        $userId = Auth::id();
+        self::$responsibilityCache = $userId === null ? [] : UserModel::responsibilityNamesFor((int) $userId);
+        return self::$responsibilityCache;
+    }
+
+    public static function hasResponsibility(string $name): bool
+    {
+        return in_array($name, self::responsibilities(), true);
+    }
+
     public static function isAdmin(): bool
     {
         return self::hasRole('system_admin');
     }
 
-    /** Reset caches (used after role changes in the same request). */
+    /** Reset caches after account-category, responsibility, or permission changes. */
     public static function flush(): void
     {
         self::$permissionCache = null;
         self::$roleCache = null;
+        self::$responsibilityCache = null;
     }
 
     /** Enforce: abort with 403 unless the permission is held. */

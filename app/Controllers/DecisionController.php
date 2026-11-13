@@ -18,8 +18,8 @@ final class DecisionController
 {
     /**
      * The final institutional decision belongs exclusively to the RPEE Director.
-     * It confirms the committee recommendation through the configured workflow;
-     * it must never write status_code directly.
+     * Committee opinions are advisory; the Director records the institutional
+     * decision through the configured workflow.
      */
     public static function finalizeDecision(): void
     {
@@ -45,14 +45,9 @@ final class DecisionController
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
-        $requiredUniversityEvaluators = (int) Database::scalar(
-            'SELECT COUNT(*) FROM evaluator_assignments
-             WHERE application_id = ? AND assignment_level = "university"
-               AND is_active = 1 AND status NOT IN ("cancelled","declined","conflict_declared")',
-            [$appId]
-        );
+        $minimumUniversityEvaluators = max(2, Settings::int('university_evaluators_minimum', 2));
         $completedUniversityEvaluators = (int) Database::scalar(
-            'SELECT COUNT(DISTINCT e.assignment_id)
+            'SELECT COUNT(DISTINCT ea.evaluator_user_id)
              FROM evaluations e
              JOIN evaluator_assignments ea ON ea.id = e.assignment_id
              WHERE e.application_id = ? AND e.status = "submitted"
@@ -61,8 +56,8 @@ final class DecisionController
                AND ea.is_active = 1 AND ea.status = "completed"',
             [$appId]
         );
-        if ($requiredUniversityEvaluators < 1 || $completedUniversityEvaluators < $requiredUniversityEvaluators) {
-            Session::flash('error', 'All currently assigned university evaluations must be completed before the Director can make a final decision.');
+        if ($completedUniversityEvaluators < $minimumUniversityEvaluators) {
+            Session::flash('error', 'At least ' . $minimumUniversityEvaluators . ' independent university evaluations must be completed before the Director can make a final decision.');
             redirect('index.php?action=application_view&id=' . $appId);
         }
 
@@ -75,48 +70,19 @@ final class DecisionController
                AND ea.is_active = 1 AND ea.status = "completed"',
             [$appId]
         );
-        if ($universityAverage === null) {
-            Session::flash('error', 'The university evaluator scores must be complete before the Director makes a final decision.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
-        $universityPassingScore = max(0.0, min(100.0, (float) Settings::get('university_proposal_passing_score', '50')));
-
         $committeeDecision = CommitteeModel::latestDecision($appId);
-        if ($committeeDecision === null) {
-            Session::flash('error', 'The assigned university committee must record its decision before Directorate confirmation.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
 
         $map = [
-            'accepted' => [
-                'committee' => ['approve', 'approve_with_conditions'],
-                'transition' => 'Approve (directorate)',
-            ],
-            'not_accepted' => [
-                'committee' => ['reject'],
-                'transition' => 'Reject (directorate)',
-            ],
-            'further_review' => [
-                'committee' => ['revision_required'],
-                'transition' => 'Request revision (directorate)',
-            ],
+            'accepted' => ['transition' => 'Approve (directorate)'],
+            'not_accepted' => ['transition' => 'Reject (directorate)'],
+            'further_review' => ['transition' => 'Request revision (directorate)'],
         ];
         if (!isset($map[$decision])) {
             Session::flash('error', 'Invalid final decision.');
             redirect('index.php?action=application_view&id=' . $appId);
         }
-        if ($decision === 'accepted' && (float) $universityAverage < $universityPassingScore) {
-            Session::flash('error', 'The university proposal average (' . round((float) $universityAverage, 2)
-                . '/100) is below the Director-configured passing threshold (' . $universityPassingScore . '/100). Acceptance is blocked; reject or return the proposal for revision.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
-        if (!in_array($committeeDecision['decision'], $map[$decision]['committee'], true)) {
-            Session::flash('error', 'The Directorate decision must be consistent with the latest committee recommendation.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
-
         try {
-            Database::transaction(function () use ($appId, $decision, $justification, $app, $map): void {
+            Database::transaction(function () use ($appId, $decision, $justification, $app, $map, $committeeDecision, $universityAverage): void {
                 [$ok, $error] = WorkflowService::fire(
                     $app,
                     'research_application',
@@ -137,7 +103,8 @@ final class DecisionController
 
                 Audit::log('directorate.final_decision', 'research_application', $appId, null, [
                     'decision' => $decision,
-                    'committee_decision' => $map[$decision]['committee'],
+                    'committee_recommendation' => $committeeDecision['decision'] ?? null,
+                    'university_average_score' => $universityAverage,
                 ]);
             });
         } catch (\Throwable $e) {

@@ -81,7 +81,7 @@ final class WorkflowController
         }
         // College scoping (§5): coordinators only manage their own college's
         // research — enforced here as an entity-level layer over RBAC (Rule 5).
-        if ((Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator'))
+        if ((Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator'))
             && Gate::denies('research.manage')) {
             $myCollege = (int) (Auth::user()['college_id'] ?? 0);
             if ($myCollege === 0 || $myCollege !== (int) $entity['college_id']) {

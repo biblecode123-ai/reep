@@ -49,15 +49,29 @@
       <?php endif; ?>
     </div>
     <?php if ($user === null): ?>
-    <h2>Roles</h2>
-    <div style="columns:2;">
-      <?php foreach ($roles as $r): ?>
-      <label style="font-weight:400;"><input type="checkbox" name="roles[]" value="<?= (int) $r['id'] ?>"
-        <?= in_array((int) $r['id'], $userRoleIds, true) ? 'checked' : '' ?>> <?= e($r['display_name']) ?></label>
-      <?php endforeach; ?>
-    </div>
+    <section aria-labelledby="primary-category-heading">
+      <h2 id="primary-category-heading">Primary account category</h2>
+      <p class="muted">Every account has exactly one primary category.</p>
+      <div class="role-choice-grid">
+        <?php foreach ($roles as $r): ?>
+        <label class="role-choice">
+          <input type="radio" name="primary_role" value="<?= (int) $r['id'] ?>" required>
+          <span><strong><?= e($r['display_name']) ?></strong><span class="muted"><?= e($r['description'] ?? '') ?></span></span>
+        </label>
+        <?php endforeach; ?>
+      </div>
+      <h2>Responsibilities</h2>
+      <div class="role-choice-grid">
+        <?php foreach ($assignments as $assignment): ?>
+        <label class="role-choice">
+          <input type="checkbox" name="responsibilities[]" value="<?= (int) $assignment['id'] ?>">
+          <span><strong><?= e($assignment['display_name']) ?></strong><span class="muted"><?= e($assignment['description'] ?? '') ?></span></span>
+        </label>
+        <?php endforeach; ?>
+      </div>
+    </section>
     <?php else: ?>
-    <p class="muted">Roles are managed on the <a href="<?= e(url('action=user_roles&id=' . (int) $user['id'])) ?>">roles page</a>.</p>
+    <p class="muted">Account category and responsibilities are managed on the <a href="<?= e(url('action=user_roles&id=' . (int) $user['id'])) ?>">access profile page</a>.</p>
     <?php endif; ?>
   </div>
 

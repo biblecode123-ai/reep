@@ -149,9 +149,31 @@ foreach ($people as [$email, $name, $role, $title, $cid, $did, $extraRoles]) {
     }
     $userIds[$role] = $uid;
 
-    $allRoles = array_merge([$role], $extraRoles);
-    foreach ($allRoles as $r) {
-        Database::run(Database::insertIgnore('user_roles') . ' (user_id, role_id) VALUES (?, ?)', [$uid, $roleId($r)]);
+    $allRoles = array_values(array_unique(array_merge([$role], $extraRoles)));
+    $primaryRole = match (true) {
+        in_array('system_admin', $allRoles, true) => 'system_admin',
+        in_array('rpee_director', $allRoles, true) => 'rpee_director',
+        in_array('college_coordinator', $allRoles, true), in_array('dept_coordinator', $allRoles, true) => 'college_coordinator',
+        default => 'researcher',
+    };
+
+    Database::run('DELETE FROM user_roles WHERE user_id = ?', [$uid]);
+    Database::run('DELETE FROM user_responsibilities WHERE user_id = ?', [$uid]);
+    Database::insert('user_roles', ['user_id' => $uid, 'role_id' => $roleId($primaryRole)]);
+
+    foreach ($allRoles as $assignedRole) {
+        $assignmentRole = Database::scalar("SELECT id FROM roles WHERE name = ? AND role_type = 'assignment'", [$assignedRole]);
+        if ($assignmentRole !== null) {
+            Database::run(Database::insertIgnore('user_responsibilities') . ' (user_id, role_id) VALUES (?, ?)', [$uid, (int) $assignmentRole]);
+            continue;
+        }
+        if ($assignedRole !== $primaryRole) {
+            Database::run(Database::insertIgnore('user_permission_grants') .
+                ' (user_id, permission_id, source_role_id)
+                 SELECT ?, rp.permission_id, NULL FROM role_permissions rp WHERE rp.role_id = ?',
+                [$uid, $roleId($assignedRole)]
+            );
+        }
     }
     if (in_array($role, ['researcher', 'principal_investigator', 'co_investigator'], true)) {
         $researcherData = ['academic_position' => $title, 'qualification' => 'PhD',
@@ -178,7 +200,6 @@ Database::run(Database::insertIgnore('research_evaluators') . ' (user_id, expert
 // ---------------------------------------------------------------------------
 $committeeSeats = [
     [$cUrc, 'univ_committee',      'chair'],
-    [$cUrc, 'rpee_director',       'secretary'],
     [$cUrc, 'rpee_officer',        'member'],
     [$cCrc, 'college_coordinator', 'chair'],
     [$cCrc, 'dept_coordinator',    'member'],

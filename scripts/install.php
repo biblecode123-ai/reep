@@ -169,8 +169,19 @@ if ($mkSample === 'yes' || $mkSample === 'y') {
         );
         $stmt->execute([sprintf('EMP-%04d', $num), $name, $email, $hash2, $title, $cid, $did]);
         $uid = (int) $pdo->lastInsertId();
-        $rid = (int) $pdo->query("SELECT id FROM roles WHERE name = '$role'")->fetchColumn();
-        $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)')->execute([$uid, $rid]);
+        $primaryRoleName = match ($role) {
+            'rpee_director' => 'rpee_director',
+            'college_coordinator', 'dept_coordinator' => 'college_coordinator',
+            default => 'researcher',
+        };
+        $primaryRoleId = (int) $pdo->query("SELECT id FROM roles WHERE name = '$primaryRoleName' AND role_type = 'primary'")->fetchColumn();
+        $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)')->execute([$uid, $primaryRoleId]);
+        if ($role !== $primaryRoleName) {
+            $assignmentId = (int) $pdo->query("SELECT id FROM roles WHERE name = '$role' AND role_type = 'assignment'")->fetchColumn();
+            if ($assignmentId > 0) {
+                $pdo->prepare('INSERT INTO user_responsibilities (user_id, role_id) VALUES (?, ?)')->execute([$uid, $assignmentId]);
+            }
+        }
         if ($role === 'researcher') {
             $pdo->prepare('INSERT INTO researchers (user_id) VALUES (?)')->execute([$uid]);
         }

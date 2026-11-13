@@ -71,8 +71,9 @@ final class CallModel
     public static function create(array $data): int
     {
         if (!array_key_exists('required_evaluators', $data) || $data['required_evaluators'] === null) {
-            $data['required_evaluators'] = max(1, Settings::int('college_evaluators_default', Settings::int('required_evaluators_default', 1)));
+            $data['required_evaluators'] = max(2, Settings::int('college_evaluators_default', Settings::int('required_evaluators_default', 2)));
         }
+        $data['required_evaluators'] = max(2, (int) $data['required_evaluators']);
         if (!isset($data['call_number'])) {
             $data['call_number'] = \App\Services\NumberingService::next('research_call');
         }
@@ -108,10 +109,20 @@ final class CallModel
 
     public static function themes(int $callId): array
     {
-        return Database::all(
+        $themes = Database::all(
             'SELECT t.* FROM research_themes t
              JOIN research_call_themes ct ON ct.theme_id = t.id
-             WHERE ct.call_id = ? ORDER BY t.name',
+             WHERE ct.call_id = ? AND t.status = 'active' ORDER BY t.name',
+            [$callId]
+        );
+        if ($themes !== []) {
+            return $themes;
+        }
+
+        return Database::all(
+            'SELECT t.* FROM research_calls c
+             JOIN research_themes t ON t.id = c.research_theme_id
+             WHERE c.id = ? AND t.status = 'active' ORDER BY t.name',
             [$callId]
         );
     }

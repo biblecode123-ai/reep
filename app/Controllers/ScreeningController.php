@@ -29,7 +29,7 @@ final class ScreeningController
      */
     private static function assertCollegeScope(array $app, string $backAction): void
     {
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         if (!$isCoordinator || Gate::allows('research.manage')) {
             return;
         }
@@ -151,10 +151,10 @@ final class ScreeningController
             'SELECT * FROM evaluator_assignments WHERE application_id = ? AND assignment_level = "college" AND is_active = 1',
             [$id]
         );
-        $requiredEvaluators = max(1, (int) (Database::scalar(
+        $requiredEvaluators = max(2, (int) (Database::scalar(
             'SELECT required_evaluators FROM research_calls WHERE id = ?',
             [(int) $app['call_id']]
-        ) ?? Settings::int('college_evaluators_default', 1)));
+        ) ?? Settings::int('college_evaluators_default', 2)));
 
         // Get proposal team members (PI and co-investigators).
         // application_team_members is the proposal-stage team table; research_project_members
@@ -174,12 +174,10 @@ final class ScreeningController
             'SELECT u.id, u.full_name, u.email, re.expertise, re.availability_status, re.max_concurrent_evaluations,
                     d.name AS department_name, c.name AS college_name, c.id AS college_id
              FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
-             JOIN roles r ON r.id = ur.role_id
              JOIN research_evaluators re ON re.user_id = u.id
              LEFT JOIN departments d ON d.id = u.department_id
              LEFT JOIN colleges c ON c.id = u.college_id
-             WHERE r.name = "evaluator" AND u.status = "active" AND u.college_id = ?
+             WHERE u.status = "active" AND u.college_id = ?
              ORDER BY u.full_name',
             [(int) $app['college_id']]
         );
@@ -263,10 +261,10 @@ final class ScreeningController
             redirect('index.php?action=assign_evaluators&id=' . $id);
         }
         $deadline = trim((string) ($_POST['deadline'] ?? '')) ?: null;
-        $required = max(1, (int) (Database::scalar(
+        $required = max(2, (int) (Database::scalar(
             'SELECT required_evaluators FROM research_calls WHERE id = ?',
             [(int) $app['call_id']]
-        ) ?? Settings::int('college_evaluators_default', 1)));
+        ) ?? Settings::int('college_evaluators_default', 2)));
 
         $conflictedAssignments = Database::all(
             'SELECT id FROM evaluator_assignments
@@ -298,8 +296,6 @@ final class ScreeningController
         foreach ($evaluatorIds as $uid) {
             $eligible = (int) Database::scalar(
                 'SELECT COUNT(*) FROM users u
-                 JOIN user_roles ur ON ur.user_id = u.id
-                 JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
                  JOIN research_evaluators re ON re.user_id = u.id
                  WHERE u.id = ? AND u.status = "active"
                    AND u.college_id = ? AND re.availability_status = "available"',
@@ -499,7 +495,7 @@ final class ScreeningController
         }
 
         // College scope check
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         if ($isCoordinator && Gate::denies('research.manage')) {
             $myCollege = (int) (Auth::user()['college_id'] ?? 0);
             if ($myCollege !== (int) $assignment['college_id']) {
@@ -545,7 +541,7 @@ final class ScreeningController
         }
 
         // College scope check
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         if ($isCoordinator && Gate::denies('research.manage')) {
             $myCollege = (int) (Auth::user()['college_id'] ?? 0);
             if ($myCollege !== (int) $assignment['college_id']) {
@@ -559,8 +555,7 @@ final class ScreeningController
         $newEvaluator = Database::one(
             'SELECT u.id, u.college_id, u.status
              FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
-             JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
+             JOIN research_evaluators re ON re.user_id = u.id
              WHERE u.id = ?',
             [$newEvaluatorId]
         );
@@ -634,7 +629,7 @@ final class ScreeningController
         }
 
         // College scope check
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         if ($isCoordinator && Gate::denies('research.manage')) {
             $myCollege = (int) (Auth::user()['college_id'] ?? 0);
             if ($myCollege !== (int) $assignment['college_id']) {
@@ -686,24 +681,18 @@ final class ScreeningController
             redirect('index.php?action=application_view&id=' . $id);
         }
 
-        // Require every active college assignment to have a submitted evaluation.
         if ($decision === 'forward_to_university') {
-            $required = (int) Database::scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments
-                 WHERE application_id = ? AND assignment_level = "college" AND is_active = 1
-                   AND status NOT IN ("cancelled","declined","conflict_declared")',
-                [$id]
-            );
+            $minimum = max(2, Settings::int('college_evaluators_minimum', 2));
             $completed = (int) Database::scalar(
-                'SELECT COUNT(DISTINCT e.assignment_id) FROM evaluations e
+                'SELECT COUNT(DISTINCT ea.evaluator_user_id) FROM evaluations e
                  JOIN evaluator_assignments ea ON ea.id = e.assignment_id
                  WHERE e.application_id = ? AND e.status = "submitted"
                    AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"
                    AND ea.is_active = 1 AND ea.status = "completed"',
                 [$id]
             );
-            if ($required < 1 || $completed < $required) {
-                Session::flash('error', "Cannot forward: only {$completed} of {$required} active college evaluator assignments are complete.");
+            if ($completed < $minimum) {
+                Session::flash('error', "Cannot forward: at least {$minimum} independent college evaluations are required ({$completed} completed).");
                 redirect('index.php?action=application_view&id=' . $id);
             }
         }
@@ -829,9 +818,10 @@ final class ScreeningController
             Session::flash('error', 'Your account has no college assigned — an administrator must set it first.');
             redirect($back);
         }
-        $roleId = Database::scalar('SELECT id FROM roles WHERE name = "evaluator"');
-        if ($roleId === null) {
-            Session::flash('error', 'The evaluator role is not configured.');
+        $roleId = Database::scalar("SELECT id FROM roles WHERE name = 'evaluator' AND role_type = 'assignment'");
+        $primaryRoleId = Database::scalar("SELECT id FROM roles WHERE name = 'researcher' AND role_type = 'primary'");
+        if ($roleId === null || $primaryRoleId === null) {
+            Session::flash('error', 'The researcher category or evaluator assignment is not configured.');
             redirect($back);
         }
         $data = [
@@ -845,7 +835,7 @@ final class ScreeningController
             'must_change_password' => 1,
         ];
         try {
-            $userId = UserModel::create($data, [(int) $roleId]);
+            $userId = UserModel::create($data, [(int) $primaryRoleId], [(int) $roleId]);
         } catch (\PDOException $e) {
             Session::flash('error', str_contains($e->getMessage(), 'Duplicate') || str_contains($e->getMessage(), 'UNIQUE')
                 ? 'An account with that email already exists.' : 'Could not create the evaluator account.');

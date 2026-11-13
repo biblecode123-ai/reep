@@ -30,13 +30,14 @@ final class NotificationService
         }
     }
 
-    /** Send to every user holding any of the given role names. */
+    /** Send to every active user holding a primary category or responsibility. */
     public static function sendToRoles(array $roleNames, string $type, string $title, ?string $body = null, ?string $link = null, string $priority = 'normal'): void
     {
         $placeholders = implode(',', array_fill(0, count($roleNames), '?'));
         $users = Database::all(
             "SELECT DISTINCT u.id FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
+             JOIN (SELECT user_id, role_id FROM user_roles
+                   UNION SELECT user_id, role_id FROM user_responsibilities) ur ON ur.user_id = u.id
              JOIN roles r ON r.id = ur.role_id
              WHERE r.name IN ($placeholders) AND u.status = 'active'",
             $roleNames
@@ -51,7 +52,8 @@ final class NotificationService
     {
         $users = Database::all(
             "SELECT DISTINCT u.id FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
+             JOIN (SELECT user_id, role_id FROM user_roles
+                   UNION SELECT user_id, role_id FROM user_responsibilities) ur ON ur.user_id = u.id
              JOIN roles r ON r.id = ur.role_id
              WHERE r.name = ? AND u.college_id = ? AND u.status = 'active'",
             [$roleName, $collegeId]

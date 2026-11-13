@@ -21,7 +21,8 @@ $data = [
     'password_hash' => password_hash('Password123!', PASSWORD_BCRYPT),
     'status' => 'active',
 ];
-$userId = UserModel::create($data, []);
+$researcherRoleId = (int) Database::scalar("SELECT id FROM roles WHERE name = 'researcher' AND role_type = 'primary'");
+$userId = UserModel::create($data, [$researcherRoleId]);
 if (!$userId) die("Failed to create test user\n");
 echo "Test user created with ID: $userId\n";
 

@@ -197,7 +197,7 @@ include APP_PATH . '/views/partials/header.php';
           <td><?= e($app['application_number']) ?></td>
           <td><?= e($app['title']) ?></td>
           <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= (int)$app['completed_count'] ?> / <?= (int)($app['required_count'] ?? 2) ?></td>
+          <td><?= (int)$app['completed_count'] ?> / 2 minimum</td>
           <td>
             <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Decide</a>
           </td>
@@ -227,7 +227,7 @@ include APP_PATH . '/views/partials/header.php';
           <td><?= e($app['application_number']) ?></td>
           <td><?= e($app['title']) ?></td>
           <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= (int)$app['completed_count'] ?> / <?= (int)($app['required_count'] ?? 2) ?></td>
+          <td><?= (int)$app['completed_count'] ?> / 2 minimum</td>
           <td>
             <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Forward</a>
           </td>

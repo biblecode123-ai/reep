@@ -85,7 +85,7 @@ include APP_PATH . '/views/partials/header.php';
 <?php if ($canAssignCollege): ?>
 <div class="card">
   <h2 class="mt0">Assign College Report Evaluators</h2>
-  <p class="muted">Default evaluator count: <?= (int) \App\Core\Settings::int('college_evaluators_default', 1) ?>. Only active evaluators from this college who are not on the project team are eligible.</p>
+  <p class="muted">Default evaluator count: <?= max(2, (int) \App\Core\Settings::int('college_evaluators_default', 2)) ?> (minimum independent reviews). Only active evaluators from this college who are not on the project team are eligible.</p>
   <form method="post" action="<?= e(url('action=final_report_assign_college')) ?>">
     <?= \App\Core\Csrf::field() ?>
     <input type="hidden" name="final_report_id" value="<?= (int) $report['id'] ?>">
@@ -116,7 +116,7 @@ include APP_PATH . '/views/partials/header.php';
 <?php if ($canAssignUniversity): ?>
 <div class="card">
   <h2 class="mt0">Assign University Report Evaluators</h2>
-  <p class="muted">Default evaluator count: <?= (int) \App\Core\Settings::int('university_evaluators_default', 1) ?>. The Research Director assigns independent university evaluators.</p>
+  <p class="muted">Default evaluator count: <?= max(2, (int) \App\Core\Settings::int('university_evaluators_default', 2)) ?> (minimum independent reviews). The Research Director assigns independent university evaluators.</p>
   <form method="post" action="<?= e(url('action=final_report_assign_university')) ?>">
     <?= \App\Core\Csrf::field() ?>
     <input type="hidden" name="final_report_id" value="<?= (int) $report['id'] ?>">

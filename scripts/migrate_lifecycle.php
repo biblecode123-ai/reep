@@ -255,9 +255,9 @@ if ($changed > 0) {
 $newTransitions = [
     // [name, from, to, permission, condition, sort]
     ['Assign to research committee', 'UNIVERSITY_REVIEW', 'UNIVERSITY_COMMITTEE_REVIEW', 'research.manage', 'committee_ready', 161],
-    ['Approve (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'APPROVED', 'research.manage', 'committee_approved', 164],
-    ['Reject (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'REJECTED', 'research.manage', 'committee_rejected', 165],
-    ['Request revision (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'REVISION_REQUIRED', 'research.manage', 'committee_wants_revision', 166],
+    ['Approve (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'APPROVED', 'research.manage', null, 164],
+    ['Reject (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'REJECTED', 'research.manage', null, 165],
+    ['Request revision (directorate)', 'UNIVERSITY_COMMITTEE_REVIEW', 'REVISION_REQUIRED', 'research.manage', null, 166],
 ];
 foreach ($newTransitions as [$name, $from, $to, $perm, $cond, $sort]) {
     $n = (int) Database::scalar(

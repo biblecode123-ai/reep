@@ -73,4 +73,3 @@ Auth::checkTimeout(); // idle timeout enforcement (spec §9)
 \class_alias(\App\Core\Settings::class, 'Settings');
 \class_alias(\App\Core\Validator::class, 'Validator');
 \class_alias(\App\Core\Audit::class, 'Audit');
-

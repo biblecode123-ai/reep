@@ -77,7 +77,7 @@
     <div class="form-row">
       <div><label>Gender</label>
         <select name="gender">
-          <?php foreach (['' => 'Prefer not to say', 'female' => 'Female', 'male' => 'Male'] as $gv => $gl): ?>
+          <?php foreach (['' => 'Prefer not to say', 'female' => 'Female', 'male' => 'Male', 'other' => 'Other'] as $gv => $gl): ?>
           <option value="<?= $gv ?>" <?= ($researcher['gender'] ?? '') === $gv ? 'selected' : '' ?>><?= $gl ?></option>
           <?php endforeach; ?>
         </select></div>
@@ -95,4 +95,3 @@
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

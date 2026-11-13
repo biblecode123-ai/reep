@@ -35,4 +35,3 @@ final class ThemeModel
         return (int) Database::scalar('SELECT COUNT(*) FROM research_calls WHERE research_theme_id = ?', [$themeId]);
     }
 }
-

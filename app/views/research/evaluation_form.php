@@ -152,55 +152,58 @@ include APP_PATH . '/views/partials/header.php';
   <?= \App\Core\Csrf::field() ?>
   <input type="hidden" name="application_id" value="<?= (int) $app['id'] ?>">
 
-  <!-- Indicator-level institutional rubric scoring -->
+  <!-- Scoring Section -->
   <div class="card" style="margin-bottom: 20px;">
-    <h2 class="mt0">College Proposal Rubric — Version <?= (int) $rubric['version'] ?></h2>
-    <p class="muted">Score every required indicator from zero up to its displayed maximum. The complete rubric totals 100 points.</p>
+    <h2 class="mt0">Scoring Criteria</h2>
+    <p class="muted">Score each criterion according to the rubric. Scores range from 0 to 100.</p>
 
-    <?php foreach ($criteria as $criterion): ?>
-      <h3><?= e($criterion['name']) ?> <span class="muted">(<?= e((string) $criterion['max_points']) ?> points)</span></h3>
-      <table class="tbl">
-        <thead><tr><th>Indicator</th><th style="width:12%;">Maximum</th><th style="width:16%;">Score</th><th>Comment</th></tr></thead>
-        <tbody>
-        <?php foreach ($criterion['indicators'] as $indicator): ?>
-          <tr>
-            <td>
-              <strong><?= e($indicator['name']) ?></strong>
-              <?php if (!empty($indicator['description'])): ?>
-                <div class="muted" style="font-size:12px;"><?= e($indicator['description']) ?></div>
-              <?php endif; ?>
-              <?php if ((int) $indicator['is_required'] === 1): ?>
-                <span class="badge badge-warning">Required</span>
-              <?php else: ?>
-                <span class="muted">Optional</span>
-              <?php endif; ?>
-            </td>
-            <td><?= e((string) $indicator['max_points']) ?></td>
-            <td>
-              <input type="number" name="score_<?= (int) $indicator['id'] ?>"
-                     class="score-input" data-max="<?= (float) $indicator['max_points'] ?>"
-                     min="0" max="<?= (float) $indicator['max_points'] ?>" step="0.01"
-                     value="<?= isset($draftData['scores'][$indicator['id']]) ? e($draftData['scores'][$indicator['id']]) : '' ?>"
-                     <?= (int) $indicator['is_required'] === 1 ? 'required' : '' ?>>
-            </td>
-            <td>
-              <input type="text" name="score_comment_<?= (int) $indicator['id'] ?>"
-                     maxlength="1000" placeholder="Indicator-specific feedback"
-                     value="<?= isset($draftData['score_comments'][$indicator['id']]) ? e($draftData['score_comments'][$indicator['id']]) : '' ?>">
-            </td>
-          </tr>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:30%;">Criterion</th>
+          <th style="width:10%;">Weight</th>
+          <th style="width:15%;">Score (0–100)</th>
+          <th style="width:45%;">Criterion-specific comments</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($criteria as $c): ?>
+        <tr>
+          <td>
+            <strong><?= e($c['criterion_name']) ?></strong>
+            <?php if (!empty($c['description'])): ?>
+            <div class="muted" style="font-size:12px;margin-top:4px;"><?= e($c['description']) ?></div>
+            <?php endif; ?>
+          </td>
+          <td><?= e((string) $c['weight_pct']) ?>%</td>
+          <td>
+            <input type="number" name="score_<?= (int) $c['id'] ?>"
+                   class="score-input"
+                   data-weight="<?= (float) $c['weight_pct'] ?>"
+                   min="0" max="100" step="0.5"
+                   value="<?= isset($draftData['scores'][$c['id']]) ? e($draftData['scores'][$c['id']]) : '' ?>"
+                   required>
+          </td>
+          <td>
+            <input type="text" name="score_comment_<?= (int) $c['id'] ?>"
+                   maxlength="500"
+                   placeholder="Optional feedback on this criterion"
+                   value="<?= isset($draftData['score_comments'][$c['id']]) ? e($draftData['score_comments'][$c['id']]) : '' ?>">
+          </td>
+        </tr>
         <?php endforeach; ?>
-        </tbody>
-      </table>
-    <?php endforeach; ?>
+      </tbody>
+    </table>
 
+    <!-- Score Summary -->
     <div style="margin-top:20px;padding:16px;background:var(--bg-soft);border-radius:4px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div><strong>Total indicator score:</strong>
+        <div>
+          <strong>Current Weighted Score:</strong>
           <span id="currentScore" style="font-size:24px;font-weight:600;margin-left:12px;">0.0</span>
-          <span class="muted">/ 100</span>
+          <span style="color:var(--muted);">/ 100</span>
         </div>
-        <div id="scorePercentage" class="muted">0%</div>
+        <div id="scorePercentage" style="color:var(--muted);">0%</div>
       </div>
     </div>
   </div>
@@ -294,24 +297,27 @@ let autoSaveInterval;
 function calculateScore() {
   const inputs = document.querySelectorAll('.score-input');
   let total = 0;
+  let weightSum = 0;
   let filled = 0;
 
   inputs.forEach(input => {
     const score = parseFloat(input.value);
     if (!isNaN(score)) {
-      const maximum = parseFloat(input.dataset.max) || 0;
-      if (score >= 0 && score <= maximum) {
-        total += score;
-        filled++;
-      }
+      const weight = parseFloat(input.dataset.weight) || 0;
+      total += score * (weight / 100);
+      weightSum += weight;
+      filled++;
     }
   });
 
-  const percentage = Math.min(100, total);
-  document.getElementById('currentScore').textContent = total.toFixed(2);
+  const weighted = weightSum > 0 ? (total * 100 / weightSum) : total;
+  const percentage = weightSum > 0 ? weighted : 0;
+
+  document.getElementById('currentScore').textContent = weighted.toFixed(1);
   document.getElementById('scorePercentage').textContent = percentage.toFixed(1) + '%';
 
-  const totalFields = inputs.length + 6;
+  // Update progress bar
+  const totalFields = inputs.length + 6; // scores + 6 required text fields
   const filledFields = filled + (document.querySelector('textarea[name="strengths"]').value ? 1 : 0)
                           + (document.querySelector('textarea[name="weaknesses"]').value ? 1 : 0)
                           + (document.querySelector('textarea[name="overall_comment"]').value ? 1 : 0)
@@ -319,6 +325,7 @@ function calculateScore() {
                           + (document.querySelector('textarea[name="methodology_feedback"]').value ? 1 : 0)
                           + (document.querySelector('textarea[name="improvement_recommendations"]').value ? 1 : 0);
   const progress = Math.min(100, Math.round((filledFields / totalFields) * 100));
+
   document.getElementById('progressBar').style.width = progress + '%';
   document.getElementById('progressText').textContent = progress + '% complete';
 }
@@ -385,4 +392,3 @@ window.addEventListener('beforeunload', function() {
 </script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

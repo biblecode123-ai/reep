@@ -486,4 +486,3 @@ say "E2E RESULT: $PASS passed, $FAIL failed"
 say "Artifacts: call=$CALL app=$APP project=$PROJ | ethics-app=$ETH app2=$APP2 project2=$PROJ2"
 say "================================"
 [ "$FAIL" -eq 0 ]
-

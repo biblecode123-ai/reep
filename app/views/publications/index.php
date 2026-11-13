@@ -20,4 +20,3 @@ include APP_PATH . '/views/partials/header.php';
 </table>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

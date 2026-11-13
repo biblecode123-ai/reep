@@ -157,7 +157,7 @@ final class ResearcherController
             'interests'      => 'max:2000',
             'areas'          => 'max:1000',
             'biography'      => 'max:5000',
-            'gender'         => 'in:,female,male',
+            'gender'         => 'in:,female,male,other',
             'orcid'          => 'max:50',
             'scholar'        => 'max:255',
         ]);
@@ -410,4 +410,3 @@ final class ResearcherController
         return ['total' => $total, 'rows' => $rows];
     }
 }
-

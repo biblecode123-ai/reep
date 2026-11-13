@@ -53,4 +53,3 @@
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

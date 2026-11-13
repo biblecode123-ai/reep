@@ -85,4 +85,3 @@ $canFilterCollege = \App\Services\ResearcherPolicy::isDirectorate();
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

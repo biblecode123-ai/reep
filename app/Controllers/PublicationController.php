@@ -49,4 +49,3 @@ final class PublicationController
         redirect('index.php?action=publications');
     }
 }
-

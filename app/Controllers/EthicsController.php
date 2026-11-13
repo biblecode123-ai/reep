@@ -519,4 +519,3 @@ final class EthicsController
         redirect('index.php?action=ethics_view&id=' . (int) $am['ethics_application_id']);
     }
 }
-

@@ -49,4 +49,3 @@ final class Settings
         self::$cache = null;
     }
 }
-

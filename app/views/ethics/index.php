@@ -7,7 +7,7 @@ $countsByStatus = [];
 foreach ($counts as $c) { $countsByStatus[$c['status']] = (int) $c['cnt']; }
 ?>
 <div class="page-head">
-  <div><h1>Ethics review (§30–§34)</h1><p>Screening, review, decisions, certificates, expiry and amendments</p></div>
+  <div><h1>Ethics review</h1><p>Screening, review, decisions, certificates, expiry and amendments</p></div>
 </div>
 
 <div class="grid grid-4">
@@ -22,7 +22,7 @@ foreach ($counts as $c) { $countsByStatus[$c['status']] = (int) $c['cnt']; }
 
 <?php if (!empty($expiring)): ?>
 <div class="alert alert-warning">
-  <strong>Expiring within 30 days (§33):</strong>
+  <strong>Expiring within 30 days:</strong>
   <ul style="margin:6px 0 0 18px;">
     <?php foreach ($expiring as $e): ?>
       <li><a href="<?= e(url('action=ethics_view&id=' . $e['id'])) ?>"><?= e($e['application_number']) ?></a>
@@ -65,4 +65,3 @@ foreach ($counts as $c) { $countsByStatus[$c['status']] = (int) $c['cnt']; }
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

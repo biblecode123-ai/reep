@@ -8,4 +8,3 @@ CREATE TABLE research_appeals (
     decision_record_id INTEGER,
     FOREIGN KEY(application_id) REFERENCES research_applications(id)
 );
-

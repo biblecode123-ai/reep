@@ -66,4 +66,3 @@
 <?= pagination_links($p, $qs ?? '') ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

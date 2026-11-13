@@ -156,7 +156,7 @@ $eligibilityOptions = [
       <select name="call_id">
         <option value="">All Calls</option>
         <?php foreach ($calls as $c): ?>
-          <option value="<?= (int) $c['id'] ?>" <?= $callFilter == (string) $c['id'] ? 'selected' : '' ?>>
+          <option value="<?= (int) $c['id'] ?>" <?= $callFilter == (string) $c['id'] ? 'selected' : '' }}>
             <?= e($c['title']) ?> (<?= e($c['reference_number']) ?>)
           </option>
         <?php endforeach; ?>
@@ -287,4 +287,3 @@ $eligibilityOptions = [
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

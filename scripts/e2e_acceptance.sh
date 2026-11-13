@@ -756,4 +756,3 @@ say "ACCEPTANCE RESULT: $PASS passed, $FAIL failed"
 say "Artifacts: college=$COLLEGE dept=$DEPT call=$CALL app=$APP proj=$PROJ committee=$COMMITTEE agreement=$AGR"
 say "================================"
 [ "$FAIL" -eq 0 ]
-

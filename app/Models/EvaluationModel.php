@@ -49,12 +49,12 @@ final class EvaluationModel
 
     public static function assign(int $applicationId, int $evaluatorUserId, int $assignedBy, ?string $deadline, string $level = 'college'): int
     {
-        // Assignments are stage-specific: the same evaluator may be assigned
-        // independently at college and university stages without overwriting history.
+        // UNIQUE(application_id, evaluator_user_id): one assignment row per
+        // evaluator per application — reactivating updates the existing row
+        // (including its level) rather than inserting a second one.
         $existing = Database::one(
-            'SELECT id, is_active FROM evaluator_assignments
-             WHERE application_id = ? AND evaluator_user_id = ? AND assignment_level = ?',
-            [$applicationId, $evaluatorUserId, $level]
+            'SELECT id, is_active FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ?',
+            [$applicationId, $evaluatorUserId]
         );
         if ($existing !== null) {
             Database::update('evaluator_assignments', [
@@ -270,7 +270,6 @@ final class EvaluationModel
 
     public static function createEvaluation(array $data): int
     {
-        // Must include rubric_template_version_id
         return Database::insert('evaluations', $data);
     }
 
@@ -382,4 +381,3 @@ final class EvaluationModel
         Database::update('revision_requests', $data, 'id = ?', [$id]);
     }
 }
-

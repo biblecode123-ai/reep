@@ -27,12 +27,6 @@ final class DirectorDashboardController
             'appealsAwaitingCommittee' => $scalar('SELECT COUNT(*) FROM appeals WHERE status = "submitted"'),
             'agreementsPending' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued","awaiting_signature")'),
             'activeProjectsAttention' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "ACTIVE"'),
-            'reportingStats' => [
-                'expected' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status IN ("due","overdue")'),
-                'submitted' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "submitted"'),
-                'reviewed' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "reviewed"'),
-                'overdue' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "overdue"'),
-            ],
             'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports WHERE status IN ("submitted","approved")'),
         ];
 
@@ -214,4 +208,3 @@ final class DirectorDashboardController
         include APP_PATH . '/views/dashboards/director.php';
     }
 }
-

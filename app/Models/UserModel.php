@@ -136,13 +136,18 @@ final class UserModel
 
     public static function hardDelete(int $id): void
     {
-        // Anonymize the user
-        self::update($id, [
-            'full_name' => 'Deleted User',
-            'email' => 'deleted_' . $id . '@example.com',
-            'password_hash' => 'deleted',
-            'status' => 'inactive',
-        ], []);
+        Database::transaction(function () use ($id) {
+            $pdo = Database::pdo();
+            if (Database::isSqlite()) {
+                $pdo->exec('PRAGMA foreign_keys = OFF');
+                $pdo->exec('DELETE FROM users WHERE id = ' . (int)$id);
+                $pdo->exec('PRAGMA foreign_keys = ON');
+            } else {
+                $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+                $pdo->exec('DELETE FROM users WHERE id = ' . (int)$id);
+                $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            }
+        });
     }
 
     public static function paginate(array $filters, int $page, int $perPage): array
@@ -202,4 +207,3 @@ final class UserModel
         return Database::all($sql, $params);
     }
 }
-

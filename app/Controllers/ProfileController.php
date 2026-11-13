@@ -91,4 +91,3 @@ final class ProfileController
         redirect('index.php?action=notifications');
     }
 }
-

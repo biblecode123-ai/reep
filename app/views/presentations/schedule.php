@@ -21,4 +21,3 @@ include APP_PATH . '/views/partials/header.php';
 </form>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

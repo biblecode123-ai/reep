@@ -82,22 +82,20 @@ return [
     'agreement_issue'      => [\App\Controllers\AgreementController::class, 'issue', 'research.manage'],
     'agreement_sign'       => [\App\Controllers\AgreementController::class, 'sign', 'research.submit'],
 
-    // Institutional rubric versions — only the Research Director publishes policy rubrics.
-    'rubrics'              => [\App\Controllers\RubricController::class, 'index', 'research.manage'],
-    'rubric_save'          => [\App\Controllers\RubricController::class, 'save', 'research.manage'],
-
     // Evaluation
     'evaluation_form'     => [\App\Controllers\EvaluationController::class, 'form', 'research.evaluate'],
     'evaluation_save_draft' => [\App\Controllers\EvaluationController::class, 'saveDraft', 'research.evaluate'],
     'evaluation_submit'   => [\App\Controllers\EvaluationController::class, 'submit', 'research.evaluate'],
     'evaluation_view'     => [\App\Controllers\EvaluationController::class, 'view', 'research.view'],
+    'rubrics'             => [\App\Controllers\RubricController::class, 'index', 'research.manage'],
+    'rubric_save'         => [\App\Controllers\RubricController::class, 'save', 'research.manage'],
     'univ_eval_assign_form' => [\App\Controllers\UniversityEvaluationController::class, 'assignEvaluatorsForm', 'research.assign'],
     'univ_eval_assign_save' => [\App\Controllers\UniversityEvaluationController::class, 'assignEvaluators', 'research.assign'],
     'univ_evaluation_form'  => [\App\Controllers\UniversityEvaluationController::class, 'universityEvaluationForm', 'research.evaluate'],
     'submit_university_evaluation' => [\App\Controllers\UniversityEvaluationController::class, 'submitUniversityEvaluation', 'research.evaluate'],
 
 
-    // Ethics (§30–§34)
+    // Ethics
     'ethics'              => [\App\Controllers\EthicsController::class, 'index', 'ethics.view'],
     'ethics_create'       => [\App\Controllers\EthicsController::class, 'createFromApplication', 'ethics.submit'],
     'ethics_edit'         => [\App\Controllers\EthicsController::class, 'edit', 'ethics.submit'],
@@ -123,21 +121,8 @@ return [
     'project_activate'    => [\App\Controllers\ProjectController::class, 'activate', 'project.activate'],
     'project_milestone_add' => [\App\Controllers\ProjectController::class, 'addMilestone', 'project.activate'],
     'project_milestone_update' => [\App\Controllers\ProjectController::class, 'updateMilestone', 'project.report'],
-    'project_report_submit' => [\App\Controllers\MonthlyReportController::class, 'submit', 'project.report'],
-    'monthly_report_submit' => [\App\Controllers\MonthlyReportController::class, 'submit', 'project.report'],
+    'project_report_submit' => [\App\Controllers\ProjectController::class, 'submitReport', 'project.report'],
     'project_report_review' => [\App\Controllers\ProjectController::class, 'reviewReport', 'research.screen'],
-
-    // Completed research report: independent college and university evaluation.
-    'final_report_submit' => [\App\Controllers\FinalReportController::class, 'submit', 'project.report'],
-    'final_report_view' => [\App\Controllers\FinalReportController::class, 'view', 'research.view'],
-    'final_report_assign_college' => [\App\Controllers\FinalReportController::class, 'assignCollegeEvaluators', 'research.assign'],
-    'final_report_assign_university' => [\App\Controllers\FinalReportController::class, 'assignUniversityEvaluators', 'research.assign'],
-    'final_report_assignment_respond' => [\App\Controllers\FinalReportController::class, 'respond', 'research.evaluate'],
-    'final_report_evaluation_form' => [\App\Controllers\FinalReportController::class, 'evaluationForm', 'research.evaluate'],
-    'final_report_evaluation_save' => [\App\Controllers\FinalReportController::class, 'saveDraft', 'research.evaluate'],
-    'final_report_evaluation_submit' => [\App\Controllers\FinalReportController::class, 'submitEvaluation', 'research.evaluate'],
-    'final_report_forward' => [\App\Controllers\FinalReportController::class, 'forwardToUniversity', 'research.screen'],
-    'final_report_decide' => [\App\Controllers\FinalReportController::class, 'finalDecision', 'research.manage'],
     'project_release_funds' => [\App\Controllers\ProjectController::class, 'releaseFunds', 'budget.release'],
     'project_extension_request' => [\App\Controllers\ProjectController::class, 'requestExtension', 'project.report'],
     'project_extension_decide' => [\App\Controllers\ProjectController::class, 'decideExtension', 'research.screen'],
@@ -223,4 +208,3 @@ return [
     'audit'               => [\App\Controllers\AdminController::class, 'auditLogs', 'audit.view'],
     'health'              => [\App\Controllers\AdminHealthController::class, 'index', 'settings.manage'],
 ];
-

@@ -43,4 +43,3 @@ Database::run($sql);
 echo "Table $table created.
 ";
 
-

@@ -16,4 +16,3 @@ ALUES (?, ?, ?, ?, ?)", $s);
 echo "Settings seeded.
 ";
 
-

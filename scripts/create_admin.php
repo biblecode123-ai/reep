@@ -51,4 +51,3 @@ $pdo->prepare('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)')->execut
 
 echo "Success: Admin user created: {$adminEmail}\n";
 echo "Password set to: {$adminPass} (Must change at first login)\n";
-

@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- MWU RPEE — Seed data (roles, permissions, workflows, settings, classifications)
 -- Institutional data lives HERE (spec Rule 2) — nothing hardcoded in PHP.
 -- Initial users are created by scripts/install.php (hashed passwords), never here.
@@ -6,9 +6,9 @@
 
 SET NAMES utf8mb4;
 
--- ---------------------------------------------------------------- roles 
+-- ---------------------------------------------------------------- roles (§7)
 INSERT INTO roles (name, display_name, description, is_system) VALUES
-('system_admin',          'System Administrator',                 'Technical system administration without academic decision authority', 1),
+('system_admin',          'System Administrator',                 'Full system administration', 1),
 ('rpee_director',         'RPEE Director',                        'Head of the Research, Publication, Ethics and Extension Office', 1),
 ('rpee_officer',          'RPEE Officer',                         'RPEE staff managing calls, review, budget and reporting', 1),
 ('univ_committee',        'University Research Committee Member', 'Member of the university research committee', 1),
@@ -28,7 +28,7 @@ INSERT INTO roles (name, display_name, description, is_system) VALUES
 ('finance_officer',       'Finance Officer',                      'Budget approval and funding release', 1),
 ('readonly_mgmt',         'Read-Only Management User',            'Institutional oversight, view only', 1);
 
--- --------------------------------------------------------- permissions 
+-- --------------------------------------------------------- permissions (§8)
 INSERT INTO permissions (name, module, description) VALUES
 ('research.view',            'research',    'View research applications'),
 ('research.create',          'research',    'Create research applications'),
@@ -97,13 +97,9 @@ INSERT INTO permissions (name, module, description) VALUES
 ('integrity.manage',         'system',      'Manage research integrity cases');
 
 -- ------------------------------------------------------------ role_permissions
--- System Administrator — technical account administration only.
--- Academic decisions, research management, policy settings, evaluator assignment,
--- and confidential academic review remain with the designated academic roles.
+-- System Administrator — everything
 INSERT INTO role_permissions (role_id, permission_id)
-SELECT r.id, p.id FROM roles r JOIN permissions p
-  ON p.name IN ('user.view','user.manage','org.view','audit.view')
-WHERE r.name = 'system_admin';
+SELECT r.id, p.id FROM roles r, permissions p WHERE r.name = 'system_admin';
 
 -- RPEE Director — full institutional authority
 INSERT INTO role_permissions (role_id, permission_id)
@@ -291,13 +287,13 @@ INSERT INTO document_types (type_code, name) VALUES
 INSERT INTO workflows (name, entity_type, description) VALUES
 ('Research Application Lifecycle','research_application','Full research application state machine (spec §18)'),
 ('Research Project Lifecycle','research_project','Implementation to completion state machine'),
-('Ethics Review Workflow','ethics_application','Screening, review, decision ');
+('Ethics Review Workflow','ethics_application','Screening, review, decision (§31)');
 
 SET @wf_research = (SELECT id FROM workflows WHERE entity_type='research_application' LIMIT 1);
 SET @wf_project  = (SELECT id FROM workflows WHERE entity_type='research_project' LIMIT 1);
 SET @wf_ethics   = (SELECT id FROM workflows WHERE entity_type='ethics_application' LIMIT 1);
 
--- Research application stages 
+-- Research application stages (§18)
 INSERT INTO workflow_stages (workflow_id, stage_code, stage_name, stage_type, is_terminal_exception, sort_order) VALUES
 (@wf_research,'DRAFT','Draft','start',0,10),
 (@wf_research,'SUBMITTED','Submitted','normal',0,20),
@@ -359,7 +355,7 @@ INSERT INTO workflow_stages (workflow_id, stage_code, stage_name, stage_type, is
 (@wf_project,'TERMINATED','Terminated','terminal',1,1101),
 (@wf_project,'CANCELLED','Cancelled','terminal',1,1102);
 
--- Ethics stages 
+-- Ethics stages (§31)
 INSERT INTO workflow_stages (workflow_id, stage_code, stage_name, stage_type, is_terminal_exception, sort_order) VALUES
 (@wf_ethics,'DRAFT','Draft','start',0,10),
 (@wf_ethics,'SUBMITTED','Submitted','normal',0,20),
@@ -518,13 +514,13 @@ INSERT INTO workflow_transitions (workflow_id, from_stage_id, to_stage_id, trans
 (@wf_ethics, @e_review,    @e_rejected,  'Reject',                    'ethics.decide',     'ethics_reviews_complete', 43),
 (@wf_ethics, @e_revreq,    @e_review,    'Resubmit for review',       'ethics.submit',     NULL, 50);
 
--- ---------------------------------------------------------------- settings 
+-- ---------------------------------------------------------------- settings (§103)
 INSERT INTO system_settings (setting_key, setting_value, setting_group, value_type, description) VALUES
 ('university_name',            'Madda Walabu University',              'general',      'string',  'Institution display name'),
 ('university_short_name',      'MWU',                                  'general',      'string',  'Short abbreviation'),
 ('office_name',                'Research, Publication, Ethics and Extension Office', 'general', 'string', 'Office display name'),
 ('office_abbreviation',        'RPEE',                                 'general',      'string',  'Office abbreviation'),
-('project_number_prefix',      'MWU-RPEE',                             'numbering',    'string',  'Prefix for generated numbers '),
+('project_number_prefix',      'MWU-RPEE',                             'numbering',    'string',  'Prefix for generated numbers (§35)'),
 ('application_number_prefix',  'MWU-RPEE-APP',                         'numbering',    'string',  'Application number prefix'),
 ('call_number_prefix',         'MWU-RPEE-CALL',                        'numbering',    'string',  'Call number prefix'),
 ('ethics_number_prefix',       'MWU-RPEE-ETH',                         'numbering',    'string',  'Ethics application number prefix'),
@@ -538,21 +534,13 @@ INSERT INTO system_settings (setting_key, setting_value, setting_group, value_ty
 ('default_evaluation_days',    '14',                                   'deadlines',    'integer', 'POLICY DECISION DEL-1: default evaluation deadline (days)'),
 ('default_revision_days',      '14',                                   'deadlines',    'integer', 'POLICY DECISION DEL-1: default revision deadline (days)'),
 ('default_final_report_days',  '14',                                   'deadlines',    'integer', 'POLICY DECISION DEL-1: default final report deadline (days)'),
-('ethics_expiry_reminder_1',   '30',                                   'ethics',       'integer', 'Days before expiry for first reminder '),
-('ethics_expiry_reminder_2',   '7',                                    'ethics',       'integer', 'Days before expiry for second reminder '),
-('escalation_after_days',      '7',                                    'notifications','integer', 'POLICY DECISION: overdue escalation period '),
+('ethics_expiry_reminder_1',   '30',                                   'ethics',       'integer', 'Days before expiry for first reminder (§33)'),
+('ethics_expiry_reminder_2',   '7',                                    'ethics',       'integer', 'Days before expiry for second reminder (§33)'),
+('escalation_after_days',      '7',                                    'notifications','integer', 'POLICY DECISION: overdue escalation period (§67)'),
 ('notification_email_enabled', '0',                                    'notifications','boolean', 'Email dispatch (disabled by default)'),
 ('repository_public_visibility','university_only',                     'repository',   'string',  'Default visibility for new repository records'),
-('evaluation_mode_default',    'single_blind',                         'research',     'string',  'Default evaluation mode'),
-('required_evaluators_default','1',                                    'research',     'integer', 'Default college evaluator count'),
-('college_evaluators_default', '1',                                    'research',     'integer', 'Default college proposal evaluator count'),
-('university_evaluators_default','1',                                  'research',     'integer', 'Default university evaluator count'),
-('college_proposal_passing_score','50',                                 'research',     'decimal', 'College proposal passing threshold out of 100'),
-('college_report_passing_score','50',                                   'research',     'decimal', 'College completed report passing threshold out of 100'),
-('university_proposal_passing_score','50',                              'research',     'decimal', 'University proposal passing threshold out of 100'),
-('university_report_passing_score','50',                                'research',     'decimal', 'University completed report passing threshold out of 100'),
-('monthly_report_due_day',      '5',                                    'research',     'integer', 'Calendar day on which the previous monthly report becomes overdue'),
-('monthly_report_reminder_days','3',                                    'research',     'integer', 'Days before monthly report due date for reminders'),
+('evaluation_mode_default',    'single_blind',                         'research',     'string',  'Default evaluation mode (§24)'),
+('required_evaluators_default','2',                                    'research',     'integer', 'POLICY DECISION WF-2: default evaluator count'),
 ('budget_currency',            'ETB',                                  'budget',       'string',  'Budget currency code'),
 ('fiscal_year_start_month',    '7',                                    'general',      'integer', 'Ethiopian fiscal year start month'),
 ('timezone',                   'Africa/Addis_Ababa',                   'general',      'string',  'Application timezone');
@@ -569,7 +557,3 @@ INSERT INTO number_sequences (seq_key, seq_year, next_value) VALUES
 ('integrity_case',      0, 1),
 ('appeal',              0, 1),
 ('research_agreement',  0, 1);
-
-
-
-

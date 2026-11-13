@@ -4,8 +4,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Core\Database;
-use App\Core\DeadlineHelper;
-use App\Core\Settings;
 
 /**
  * Research calls (spec §11–§14).
@@ -45,15 +43,15 @@ final class CallModel
 
     public static function openCalls(): array
     {
-        $calls = Database::all(
+        $now = Database::isSqlite() ? "datetime('now')" : 'NOW()';
+        return Database::all(
             "SELECT c.*, th.name AS theme_name,
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
-             WHERE c.status IN ('published','open')
-             ORDER BY c.opens_at ASC"
+             WHERE c.status IN ('published','open') AND (c.closes_at IS NULL OR c.closes_at > $now)
+             ORDER BY c.closes_at ASC"
         );
-        return array_values(array_filter($calls, static fn(array $call): bool => DeadlineHelper::isCallOpen($call)));
     }
 
     public static function find(int $id): ?array
@@ -70,9 +68,6 @@ final class CallModel
 
     public static function create(array $data): int
     {
-        if (!array_key_exists('required_evaluators', $data) || $data['required_evaluators'] === null) {
-            $data['required_evaluators'] = max(1, Settings::int('college_evaluators_default', Settings::int('required_evaluators_default', 1)));
-        }
         if (!isset($data['call_number'])) {
             $data['call_number'] = \App\Services\NumberingService::next('research_call');
         }
@@ -160,4 +155,3 @@ final class CallModel
         return self::criteria($callId);
     }
 }
-

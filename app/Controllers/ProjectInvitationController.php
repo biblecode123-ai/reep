@@ -104,4 +104,3 @@ final class ProjectInvitationController {
         redirect('index.php?action=projects');
     }
 }
-

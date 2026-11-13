@@ -374,4 +374,3 @@ The dashboard uses:
 The Research Director Dashboard provides comprehensive, real-time visibility into university research operations. All displayed figures are backed by live database queries, and all workflow actions respect existing authorization rules. The dashboard prioritizes pending actions above decorative elements, following the principle that the Director should immediately see what requires attention.
 
 The implementation reuses existing architecture, maintains data integrity, and follows the established MWU-RMS design system. No mock statistics or hardcoded values are used, ensuring the dashboard remains accurate as the system evolves.
-

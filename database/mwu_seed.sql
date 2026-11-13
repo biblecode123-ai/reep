@@ -83,4 +83,3 @@ INSERT INTO departments (college_id, name, code) VALUES
 
 -- SOL
 ((SELECT id FROM colleges WHERE code='SOL'), 'Law', 'L-SOL');
-

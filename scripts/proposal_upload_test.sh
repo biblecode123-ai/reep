@@ -198,4 +198,3 @@ say ""
 say "RESULT: $PASS passed, $FAIL failed"
 say "Artifacts: call=$CALL app=$APP (title: Soil Fertility Mapping with Drone Spectrometry)"
 [ "$FAIL" = "0" ] || exit 1
-

@@ -113,4 +113,3 @@ final class ResearcherPolicy
         return ['where' => 'u.id = ?', 'params' => [(string) Auth::id()]];
     }
 }
-

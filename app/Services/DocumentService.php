@@ -177,6 +177,9 @@ final class DocumentService
         if (!Auth::check()) {
             return false;
         }
+        if (Gate::isAdmin()) {
+            return true;
+        }
         if (Gate::denies('document.view')) {
             return false;
         }
@@ -263,10 +266,7 @@ final class DocumentService
                 )),
             'research_application' => (bool) Database::scalar(
                 'SELECT COUNT(*) FROM research_applications WHERE id = ? AND pi_user_id = ?',
-                [(int) $doc['entity_id'], Auth::id()])
-                || (bool) Database::scalar(
-                    'SELECT COUNT(*) FROM application_team_members WHERE application_id = ? AND user_id = ? AND status = "accepted"',
-                    [(int) $doc['entity_id'], Auth::id()]),
+                [(int) $doc['entity_id'], Auth::id()]),
             'research_project' => (bool) Database::scalar(
                 'SELECT COUNT(*) FROM research_project_members WHERE project_id = ? AND user_id = ? AND status = "active"',
                 [(int) $doc['entity_id'], Auth::id()]),
@@ -282,74 +282,31 @@ final class DocumentService
 
     private static function userIsEntityReviewer(array $doc): bool
     {
+        // Coordinators/RPEE/evaluators of the entity's college or assignment.
         if ($doc['entity_type'] === 'research_application') {
-            $applicationId = (int) $doc['entity_id'];
             $assigned = (bool) Database::scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments
-                 WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1
-                   AND status NOT IN ("conflict_declared", "declined", "cancelled")',
-                [$applicationId, Auth::id()]
+                'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND evaluator_user_id = ? AND is_active = 1',
+                [(int) $doc['entity_id'], Auth::id()]
             );
             if ($assigned) {
                 return true;
             }
-
-            $college = Database::scalar(
-                'SELECT college_id FROM research_applications WHERE id = ?',
-                [$applicationId]
-            );
-            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
-            if ($isCoordinator && !Gate::allows('research.manage')) {
-                $user = Auth::user();
-                return $college !== null && $user !== null
-                    && (int) ($user['college_id'] ?? 0) > 0
-                    && (int) ($user['college_id'] ?? 0) === (int) $college
-                    && Gate::allows('research.screen');
+            $college = Database::scalar('SELECT college_id FROM research_applications WHERE id = ?', [(int) $doc['entity_id']]);
+            if ($college !== null && Gate::allows('research.screen', 'research.review', 'research.manage')) {
+                // Coordinators are college-scoped (spec §4/§5): they may only
+                // review applications — and their documents — of their own
+                // college. Directorate/committee reviewers are university-wide.
+                if ((Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator'))
+                    && !Gate::allows('research.manage')) {
+                    $user = Auth::user();
+                    return $user !== null && (int) ($user['college_id'] ?? -1) === (int) $college;
+                }
+                return true; // institutional reviewers with screening/review rights
             }
-
-            // Only Directorate officers receive institution-wide reviewer access.
-            // A committee member must have an active assignment to THIS application.
-            $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
-            if ($isDirectorateOfficer && Gate::allows('research.review', 'research.screen', 'research.manage')) {
-                return true;
-            }
-
-            $committeeAssignment = \App\Models\CommitteeModel::activeAssignment($applicationId);
-            return $committeeAssignment !== null
-                && \App\Models\CommitteeModel::isMember(
-                    (int) $committeeAssignment['committee_id'],
-                    (int) Auth::id()
-                );
         }
-
-        if ($doc['entity_type'] === 'research_project') {
-            $projectId = (int) $doc['entity_id'];
-            $assigned = (bool) Database::scalar(
-                'SELECT COUNT(*) FROM project_evaluator_assignments pea
-                 JOIN project_final_reports pfr ON pfr.id = pea.final_report_id
-                 WHERE pfr.project_id = ? AND pea.evaluator_user_id = ? AND pea.is_active = 1
-                   AND pea.status NOT IN ("conflict_declared", "declined", "cancelled")',
-                [$projectId, Auth::id()]
-            );
-            if ($assigned) {
-                return true;
-            }
-
-            $college = Database::scalar('SELECT college_id FROM research_projects WHERE id = ?', [$projectId]);
-            $user = Auth::user();
-            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
-            if ($isCoordinator && Gate::allows('research.screen') && $college !== null
-                && $user !== null && (int) ($user['college_id'] ?? 0) === (int) $college) {
-                return true;
-            }
-
-            return (Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer'))
-                && Gate::allows('research.manage', 'research.review');
-        }
-
         if ($doc['entity_type'] === 'research_dataset') {
             return (bool) Database::scalar(
-                'SELECT COUNT(*) FROM research_datasets d JOIN research_project_members m ON d.project_id = m.project_id
+                'SELECT COUNT(*) FROM research_datasets d JOIN research_project_members m ON d.project_id = m.project_id 
                  WHERE d.id = ? AND m.user_id = ? AND m.status = "active"',
                 [(int) $doc['entity_id'], Auth::id()]
             );
@@ -359,9 +316,11 @@ final class DocumentService
                 'SELECT COUNT(*) FROM ethics_reviews WHERE ethics_application_id = ? AND reviewer_user_id = ?',
                 [(int) $doc['entity_id'], Auth::id()]
             );
-            return $rev || Gate::allows('ethics.manage');
+            if ($rev || Gate::allows('ethics.review', 'ethics.manage')) {
+                return true;
+            }
         }
-        return Gate::allows('research.manage') && (Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer'));
+        return Gate::allows('research.manage', 'ethics.manage');
     }
 
     private static function userInCollegeOfEntity(array $doc): bool
@@ -392,4 +351,3 @@ final class DocumentService
         };
     }
 }
-

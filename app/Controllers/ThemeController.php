@@ -97,4 +97,3 @@ final class ThemeController
         redirect('index.php?action=themes');
     }
 }
-

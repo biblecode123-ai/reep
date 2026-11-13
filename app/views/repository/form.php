@@ -106,4 +106,3 @@ $statuses = ['draft' => 'Draft', 'published' => 'Published', 'embargoed' => 'Emb
 </form>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

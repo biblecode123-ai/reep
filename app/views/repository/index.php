@@ -82,4 +82,3 @@ $canManage = Gate::allows('repository.manage');
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

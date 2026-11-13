@@ -6,7 +6,6 @@ namespace App\Controllers;
 use App\Core\Audit;
 use App\Core\Auth;
 use App\Core\Csrf;
-use App\Core\DeadlineHelper;
 use App\Core\Database;
 use App\Core\Gate;
 use App\Core\Session;
@@ -56,6 +55,12 @@ final class CallController
             Session::flash('error', implode(' ', $errors));
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
+        // Every call must state its research theme (§20).
+        $themeId = (int) ($_POST['theme'] ?? 0);
+        if ($themeId === 0 || Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ?', [$themeId]) == 0) {
+            Session::flash('error', 'Please select the research theme for this call.');
+            redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
+        }
         $data = [
             'title'            => $clean['title'],
             'reference_number' => $clean['reference_number'],
@@ -63,7 +68,7 @@ final class CallController
             'research_priorities' => trim((string) ($_POST['priorities'] ?? '')) ?: null,
             'opens_at'         => ($_POST['opens_at'] ?? '') ?: null,
             'closes_at'        => ($_POST['closes_at'] ?? '') ?: null,
-            'research_theme_id' => null,
+            'research_theme_id' => (int) ($_POST['theme'] ?? 0) ?: null,
         ];
         try {
             if ($id > 0) {
@@ -233,23 +238,9 @@ final class CallController
             Session::flash('error', 'Invalid status.');
             redirect('index.php?action=call_view&id=' . $id);
         }
-        $call = CallModel::find($id);
-        if ($call === null) {
-            Session::flash('error', 'Research call not found.');
-            redirect('index.php?action=calls');
-        }
-        if (in_array($status, ['published', 'open'], true) && !DeadlineHelper::hasValidWindow($call)) {
-            Session::flash('error', 'Set a valid opening date and a closing date later than the opening date before publishing this call.');
-            redirect('index.php?action=call_view&id=' . $id);
-        }
-        if ($status === 'open' && !DeadlineHelper::isCallOpen(array_merge($call, ['status' => 'open']))) {
-            Session::flash('error', 'The call can only be opened during its configured submission period. Publish it to schedule the opening.');
-            redirect('index.php?action=call_view&id=' . $id);
-        }
         CallModel::update($id, ['status' => $status, 'closed_at' => $status === 'closed' ? date('Y-m-d H:i:s') : null]);
         Audit::log('call.status_changed', 'research_call', $id, null, ['status' => $status]);
         Session::flash('success', 'Call status updated.');
         redirect('index.php?action=call_view&id=' . $id);
     }
 }
-

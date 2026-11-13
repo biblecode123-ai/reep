@@ -160,4 +160,3 @@ final class CommitteeController
         include APP_PATH . '/views/research/committee_queue.php';
     }
 }
-

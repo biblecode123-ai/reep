@@ -12,7 +12,6 @@ $navMap = [
     'director_dashboard'   => ['Director Dashboard', 'research.manage'],
     'applications'   => ['Research', 'research.view'],
     'themes'         => ['Themes', 'research.manage'],
-    'rubrics'        => ['Evaluation Rubrics', 'research.manage'],
     'ethics'         => ['Ethics', 'ethics.view'],
     'projects'       => ['Projects', 'project.view'],
     'calls_public'   => ['Calls', 'research.create'],
@@ -22,6 +21,7 @@ $navMap = [
     'repository'     => ['Repository', 'repository.view'],
     'users'          => ['Users', 'user.view'],
     'colleges'       => ['College', 'org.view'],
+    'rubrics'        => ['Rubrics', 'research.manage'],
     'settings'       => ['Settings', 'settings.manage'],
     'audit'          => ['Audit', 'audit.view'],
 ];
@@ -42,22 +42,8 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
         'my_evaluations' => ['My Evaluations', 'research.evaluate'],
         'repository'     => ['Repository', 'repository.view'],
     ];
-} elseif (Gate::hasRole('rpee_director')) {
-    $navMap = [
-        'director_dashboard' => ['Director Dashboard', 'research.manage'],
-        'applications'   => ['Research', 'research.view'],
-        'themes'         => ['Themes', 'research.manage'],
-        'ethics'         => ['Ethics', 'ethics.view'],
-        'projects'       => ['Projects', 'project.view'],
-        'calls_public'   => ['Calls', 'research.create'],
-        'researchers'   => ['Researchers', 'researcher.view'],
-        'committees'     => ['Committees', 'committee.manage'],
-        'repository'     => ['Repository', 'repository.view'],
-        'users'          => ['Users', 'user.view'],
-        'colleges'       => ['College', 'org.view'],
-        'settings'       => ['Settings', 'settings.manage'],
-        'audit'          => ['Audit', 'audit.view'],
-    ];
+} elseif (Gate::hasRole('research_director')) {
+    unset($navMap['settings']);
 } elseif (Gate::hasRole('college_coordinator')) {
     $navMap = [
         'coordinator_dashboard' => ['Dashboard', 'research.view'],
@@ -95,7 +81,6 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
         <a href="<?= e(url('action=' . $navAction)) ?>" class="<?= $currentAction === $navAction
           || ($navAction === 'applications' && in_array($currentAction, ['application_view', 'application_form', 'calls'], true))
           || ($navAction === 'my_evaluations' && in_array($currentAction, ['evaluation_form', 'evaluation_view', 'univ_evaluation_form'], true))
-          || ($navAction === 'rubrics' && in_array($currentAction, ['rubric_save'], true))
           || ($navAction === 'ethics' && str_starts_with($currentAction, 'ethics'))
           || ($navAction === 'repository' && str_starts_with($currentAction, 'repository'))
           || ($navAction === 'users' && str_starts_with($currentAction, 'user'))
@@ -123,4 +108,3 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
 <?php if (!empty($mustChangePassword) || (Auth::check() && (int) Auth::user()['must_change_password'] === 1)): ?>
   <div class="alert alert-warning">You are using an initial password. Please change it on your <a href="<?= e(url('action=profile')) ?>">profile page</a>.</div>
 <?php endif; ?>
-

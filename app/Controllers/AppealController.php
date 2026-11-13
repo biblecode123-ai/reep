@@ -41,4 +41,3 @@ final class AppealController
         redirect('index.php?action=application_view&id=' . $appId);
     }
 }
-

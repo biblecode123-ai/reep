@@ -162,4 +162,3 @@ function csrf_meta(): string
 {
     return '<meta name="csrf-token" content="' . e(\App\Core\Csrf::token()) . '">';
 }
-

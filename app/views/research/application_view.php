@@ -31,7 +31,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       </form>
     <?php endif; ?>
     <?php if (Gate::allows('research.assign') && $app['status_code'] === 'EVALUATOR_ASSIGNMENT_PENDING'): ?>
-      <a class="btn" href="<?= e(url('action=assign_evaluators&application_id=' . $app['id'])) ?>">Assign evaluators</a>
+      <a class="btn" href="<?= e(url('action=assign_evaluators&id=' . $app['id'])) ?>">Assign evaluators</a>
     <?php endif; ?>
     <?php if (Gate::allows('research.assign') && $app['status_code'] === 'UNIV_EVAL_ASSIGNMENT_PENDING'): ?>
       <a class="btn" href="<?= e(url('action=univ_eval_assign_form&application_id=' . $app['id'])) ?>">Assign university evaluators</a>
@@ -109,7 +109,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
   <!-- RIGHT: workflow, evaluations, history -->
   <div>
     <div class="card">
-      <h2 class="mt0">Status timeline</h2>
+      <h2 class="mt0">Status timeline (§107)</h2>
       <?php
         $stages = ['DRAFT','SUBMITTED','COLLEGE_RECEIVED','UNDER_COLLEGE_SCREENING','EVALUATOR_ASSIGNMENT_PENDING',
                    'EVALUATOR_ASSIGNED','EVALUATOR_ACCEPTED','UNDER_EVALUATION','EVALUATION_COMPLETED',
@@ -492,7 +492,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 
     <!-- University research committee (§11–§12; Rules 8 & 9) -->
     <div class="card" id="committee">
-      <h2 class="mt0">University Research Committee</h2>
+      <h2 class="mt0">University Research Committee <span class="muted" style="font-size:13px;font-weight:400;">(§12)</span></h2>
       <?php if ($assignableCommittees): ?>
         <form method="post" action="<?= e(url('action=app_committee_assign')) ?>" style="margin-bottom:12px;">
           <?= \App\Core\Csrf::field() ?>
@@ -571,7 +571,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 
     <!-- Budget allocation (§28 step 32; Rule 13) -->
     <div class="card" id="budget">
-      <h2 class="mt0">Budget allocation</h2>
+      <h2 class="mt0">Budget allocation <span class="muted" style="font-size:13px;font-weight:400;">(§28)</span></h2>
       <dl class="kv">
         <dt>Requested</dt><dd><?= e(format_money($app['budget_requested'])) ?></dd>
         <?php if ($app['budget_approved_amount'] !== null): ?>
@@ -689,7 +689,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       $ethics = \App\Models\EthicsModel::findByResearchApplication((int) $app['id']);
     ?>
     <div class="card">
-      <h2 class="mt0">Ethics (§30–§34)</h2>
+      <h2 class="mt0">Ethics</h2>
       <p class="muted" style="font-size:13px;margin-bottom:8px;">Declared requirement: <strong><?= e(ucfirst((string) $app['requires_ethics'])) ?></strong></p>
       <?php if ($ethics === null): ?>
         <?php if ($isPi && Gate::allows('ethics.submit')): ?>
@@ -743,4 +743,3 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
 <script src="<?= e(base_url('assets/js/team.js')) ?>"></script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

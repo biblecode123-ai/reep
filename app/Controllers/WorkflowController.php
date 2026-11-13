@@ -144,4 +144,3 @@ final class WorkflowController
         redirect('index.php?action=ethics_view&id=' . $entityId);
     }
 }
-

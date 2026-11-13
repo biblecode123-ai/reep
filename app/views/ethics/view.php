@@ -292,4 +292,3 @@ $isResearcher = (int) $eth['researcher_user_id'] === Auth::id();
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

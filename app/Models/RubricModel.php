@@ -123,7 +123,10 @@ final class RubricModel
                 $criterionId = Database::insert('rubric_criteria', [
                     'template_id' => $templateId,
                     'name' => trim((string) $criterion['name']),
+                    'description' => trim((string) ($criterion['description'] ?? '')) ?: null,
+                    'instructions' => trim((string) ($criterion['instructions'] ?? '')) ?: null,
                     'max_points' => (float) $criterion['max_points'],
+                    'weight_pct' => (float) ($criterion['weight_pct'] ?? 0),
                     'sort_order' => $criterionOrder,
                 ]);
                 foreach (array_values((array) $criterion['indicators']) as $indicatorOrder => $indicator) {
@@ -192,6 +195,9 @@ final class RubricModel
                         'max_points' => (float) $indicator['max_points'],
                         'is_required' => (bool) $indicator['is_required'],
                     ], $criterion['indicators'] ?? []),
+                    'description' => $criterion['description'] ?? '',
+                    'instructions' => $criterion['instructions'] ?? '',
+                    'weight_pct' => (float) $criterion['weight_pct'],
                 ];
             }, $template['criteria'] ?? []),
         ];

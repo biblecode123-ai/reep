@@ -167,4 +167,3 @@ created=$(db "SELECT COUNT(*) FROM audit_logs WHERE action='user.created'")
 say ""
 say "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" = "0" ] || exit 1
-

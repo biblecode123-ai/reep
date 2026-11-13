@@ -114,4 +114,3 @@ $canPublish = Gate::allows('repository.publish');
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

@@ -7,4 +7,3 @@ if (session_start()) {
 }
 echo "Save path: " . session_save_path() . "\n";
 echo "Is writable: " . (is_writable(session_save_path()) ? 'Yes' : 'No') . "\n";
-

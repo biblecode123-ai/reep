@@ -153,8 +153,8 @@ final class AdminController
         }
 
         UserModel::hardDelete($id);
-        Audit::log('user.deleted', 'user', $id);
-        Session::flash('success', 'User permanently deleted and anonymized.');
+        Audit::log('user.destroyed', 'user', $id);
+        Session::flash('success', 'User permanently deleted.');
         redirect('index.php?action=users');
     }
 
@@ -463,4 +463,3 @@ final class AdminController
         include APP_PATH . '/views/admin/audit.php';
     }
 }
-

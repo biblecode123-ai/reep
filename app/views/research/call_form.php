@@ -15,6 +15,15 @@
       <div><label>Title <span class="req">*</span></label><input type="text" name="title" required maxlength="200" value="<?= e($call['title'] ?? '') ?>"></div>
       <div><label>Reference number <span class="req">*</span></label><input type="text" name="reference_number" required maxlength="60" value="<?= e($call['reference_number'] ?? '') ?>"></div>
     </div>
+    <div class="form-row">
+      <div><label></label>
+        <select name="theme" required>
+          <option value="">— select research theme —</option>
+          <?php foreach ($themes as $t): ?>
+          <option value="<?= (int) $t['id'] ?>" <?= (int) ($call['research_theme_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['name']) ?></option>
+          <?php endforeach; ?>
+        </select></div>
+    </div>
     <label>Description</label>
     <textarea name="description"><?= e($call['description'] ?? '') ?></textarea>
     <label>Research priorities</label>
@@ -32,4 +41,3 @@
 </form>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

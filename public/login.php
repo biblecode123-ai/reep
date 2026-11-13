@@ -25,4 +25,3 @@ match ($action) {
     'do_reset'  => AuthController::doReset(),
     default     => AuthController::showLogin(),
 };
-

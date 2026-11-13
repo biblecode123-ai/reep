@@ -334,6 +334,7 @@
 
     <div class="card">
         <h3 class="mt0">Recent Committee Assignments</h3>
+        <p><a class="btn" href="<?= e(url('action=rubrics')) ?>">Manage Evaluation Rubrics</a></p>
         <?php if (empty($recentCommitteeAssignments)): ?>
             <p class="muted">No recent committee assignments.</p>
         <?php else: ?>
@@ -553,4 +554,3 @@
 </section>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

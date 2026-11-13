@@ -30,4 +30,3 @@ final class RepositoryCatalogService
         return Database::all($sql, $params);
     }
 }
-

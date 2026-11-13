@@ -100,4 +100,3 @@ final class Validator
         return [$errors === [], $errors, $clean];
     }
 }
-

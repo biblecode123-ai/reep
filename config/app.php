@@ -21,4 +21,3 @@ define('LOG_PATH', STORAGE_PATH . '/private/logs');
 define('STORAGE_SUBDIRS', ['research', 'ethics', 'publication', 'extension', 'repository', 'private']);
 
 date_default_timezone_set(APP_TIMEZONE);
-

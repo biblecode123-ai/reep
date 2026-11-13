@@ -49,4 +49,3 @@ final class ResearchTeamService
         return [true, 'Invitation sent.'];
     }
 }
-

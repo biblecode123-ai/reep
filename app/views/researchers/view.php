@@ -102,4 +102,3 @@ $statusBadge = ['ACTIVE' => 'badge-success', 'PROGRESS_MONITORING' => 'badge-pri
 </div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

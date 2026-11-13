@@ -48,4 +48,3 @@ final class ResearchApplicationService
         return WorkflowService::fire($app, 'research_application', 'Submit application', $comment);
     }
 }
-

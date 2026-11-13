@@ -368,4 +368,3 @@ include APP_PATH . '/views/partials/header.php';
 <?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

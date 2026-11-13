@@ -28,4 +28,3 @@ VALUES (
     (SELECT id FROM users WHERE email = 'admin@mwu.edu.et'), 
     (SELECT id FROM roles WHERE name = 'system_admin')
 );
-

@@ -38,4 +38,3 @@ final class RepositoryService
         Audit::log('repository.published', 'research_repository_item', $itemId);
     }
 }
-

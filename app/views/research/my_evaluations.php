@@ -67,7 +67,7 @@
   </form>
 </div>
 
-<?php if (!$assignments && !$projectAssignments): ?>
+<?php if (!$assignments): ?>
 <div class="card">
   <p class="muted">
     <?php if (!empty($_GET['status']) || !empty($_GET['level']) || !empty($_GET['q']) || !empty($_GET['overdue_only'])): ?>
@@ -77,7 +77,7 @@
     <?php endif; ?>
   </p>
 </div>
-<?php elseif ($assignments): ?>
+<?php else: ?>
 <table class="tbl">
   <thead>
     <tr>
@@ -172,52 +172,4 @@
 </table>
 <?php endif; ?>
 
-<?php if ($projectAssignments): ?>
-<div class="card" style="margin-top:24px;">
-  <h2 class="mt0">Completed Research Report Assignments</h2>
-  <p class="muted">Independent College and University evaluation of completed research reports.</p>
-  <table class="tbl">
-    <thead><tr><th>Project / Report</th><th>PI / College</th><th>Stage</th><th>Status</th><th>Actions</th></tr></thead>
-    <tbody>
-    <?php foreach ($projectAssignments as $pa): ?>
-      <tr>
-        <td>
-          <strong><?= e($pa['project_number']) ?> · v<?= (int) $pa['version'] ?></strong>
-          <div><?= e($pa['project_title']) ?></div>
-        </td>
-        <td><?= e($pa['pi_name']) ?><div class="muted"><?= e($pa['college_name'] ?? '—') ?></div></td>
-        <td><?= e(ucfirst($pa['assignment_level'])) ?></td>
-        <td><?= e(str_replace('_', ' ', $pa['status'])) ?></td>
-        <td class="actions">
-          <?php if ($pa['status'] === 'assigned'): ?>
-            <form method="post" action="<?= e(url('action=final_report_assignment_respond')) ?>">
-              <?= \App\Core\Csrf::field() ?>
-              <input type="hidden" name="assignment_id" value="<?= (int) $pa['id'] ?>">
-              <select name="response" required>
-                <option value="accepted">Accept</option>
-                <option value="declined">Decline</option>
-                <option value="conflict_declared">Declare conflict</option>
-              </select>
-              <input type="text" name="reason" maxlength="1000" placeholder="Reason required for decline/conflict">
-              <button class="btn btn-sm" type="submit">Submit</button>
-            </form>
-          <?php elseif ($pa['status'] === 'accepted'): ?>
-            <a class="btn btn-sm" href="<?= e(url('action=final_report_evaluation_form&final_report_id=' . (int) $pa['final_report_id'] . '&assignment_id=' . (int) $pa['id'])) ?>">Open evaluation</a>
-          <?php elseif ($pa['status'] === 'completed'): ?>
-            <span class="badge badge-success">Submitted</span>
-          <?php elseif ($pa['status'] === 'conflict_declared'): ?>
-            <span class="muted">Conflict declared</span>
-          <?php elseif ($pa['status'] === 'declined'): ?>
-            <span class="muted">Declined</span>
-          <?php endif; ?>
-          <a class="btn btn-outline btn-sm" href="<?= e(url('action=final_report_view&id=' . (int) $pa['final_report_id'])) ?>">View report</a>
-        </td>
-      </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-</div>
-<?php endif; ?>
-
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
-

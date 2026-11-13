@@ -23,4 +23,3 @@ Database::run("DELETE FROM roles WHERE id = ?", [$r['id']]);
 echo "Roles cleanup complete.
 ";
 
-

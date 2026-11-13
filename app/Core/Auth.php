@@ -146,4 +146,3 @@ final class Auth
         return true;
     }
 }
-

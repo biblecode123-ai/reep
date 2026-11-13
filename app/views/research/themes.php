@@ -3,7 +3,7 @@
 <div class="page-head">
     <div>
         <h1>Research Themes</h1>
-        <p>Manage university-level research themes (§6).</p>
+        <p>Manage the university-wide theme catalogue. Themes can be associated with multiple research calls.</p>
     </div>
     <div class="actions">
         <a href="<?= e(url('action=theme_form')) ?>" class="btn">New Theme</a>

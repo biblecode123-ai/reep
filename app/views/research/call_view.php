@@ -43,7 +43,7 @@ $appCount = (int) Database::scalar('SELECT COUNT(*) FROM research_applications W
     <h3>Priorities</h3>
     <p style="white-space:pre-wrap;"><?= e($call['research_priorities'] ?? '—') ?></p>
     <dl class="kv">
-      <dt>Research theme</dt><dd><?= e($call['theme_name'] ?? '—') ?></dd>
+      <dt>Research theme</dt><dd><?= e(implode(', ', array_column($callThemes, 'name')) ?: ($call['theme_name'] ?? '—')) ?></dd>
       <dt>Opens</dt><dd><?= e(format_datetime($call['opens_at'] ?? '')) ?></dd>
       <dt>Closes</dt><dd><?= e(format_datetime($call['closes_at'] ?? '')) ?></dd>
       <dt>Research window</dt><dd><?= e(format_date($call['research_start_date'] ?? '')) ?> → <?= e(format_date($call['completion_deadline'] ?? '')) ?></dd>

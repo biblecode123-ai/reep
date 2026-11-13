@@ -30,11 +30,12 @@ final class CallModel
 
         $total = (int) Database::scalar("SELECT COUNT(*) FROM research_calls c WHERE $whereSql", $params);
         $rows  = Database::all(
-            "SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name,
+            "SELECT c.*, u.full_name AS created_by_name, COALESCE(cthemes.theme_names, th.name) AS theme_name,
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE $whereSql
              ORDER BY c.created_at DESC
              LIMIT " . (int) $perPage . ' OFFSET ' . (int) (($page - 1) * $perPage),
@@ -46,10 +47,11 @@ final class CallModel
     public static function openCalls(): array
     {
         $calls = Database::all(
-            "SELECT c.*, th.name AS theme_name,
+            "SELECT c.*, COALESCE(cthemes.theme_names, th.name) AS theme_name,
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE c.status IN ('published','open')
              ORDER BY c.opens_at ASC"
         );
@@ -59,10 +61,11 @@ final class CallModel
     public static function find(int $id): ?array
     {
         return Database::one(
-            'SELECT c.*, u.full_name AS created_by_name, th.name AS theme_name
+            'SELECT c.*, u.full_name AS created_by_name, COALESCE(cthemes.theme_names, th.name) AS theme_name
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
+             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE c.id = ?',
             [$id]
         );
@@ -82,6 +85,38 @@ final class CallModel
     public static function update(int $id, array $data): void
     {
         Database::update('research_calls', $data, 'id = ?', [$id]);
+    }
+
+    /** Associate one or more university-wide themes with a call. Legacy single-theme data is retained. */
+    public static function setThemes(int $callId, array $themeIds): void
+    {
+        $themeIds = array_values(array_unique(array_filter(array_map('intval', $themeIds), static fn(int $id): bool => $id > 0)));
+        if ($themeIds === []) {
+            throw new \\InvalidArgumentException('Select at least one research theme for this call.');
+        }
+        foreach ($themeIds as $themeId) {
+            if ((int) Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ? AND status = "active"', [$themeId]) !== 1) {
+                throw new \\InvalidArgumentException('One or more selected themes are unavailable.');
+            }
+        }
+        Database::transaction(function () use ($callId, $themeIds): void {
+            Database::run('DELETE FROM research_call_themes WHERE call_id = ?', [$callId]);
+            foreach ($themeIds as $themeId) {
+                Database::insert('research_call_themes', ['call_id' => $callId, 'theme_id' => $themeId]);
+            }
+            // Keep the original column populated for older reports/integrations.
+            Database::run('UPDATE research_calls SET research_theme_id = ? WHERE id = ?', [$themeIds[0], $callId]);
+        });
+    }
+
+    public static function themes(int $callId): array
+    {
+        return Database::all(
+            'SELECT t.* FROM research_themes t
+             JOIN research_call_themes ct ON ct.theme_id = t.id
+             WHERE ct.call_id = ? ORDER BY t.name',
+            [$callId]
+        );
     }
 
     public static function setEligibility(int $callId, array $rows): void

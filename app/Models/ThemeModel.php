@@ -32,6 +32,7 @@ final class ThemeModel
 
     public static function countCalls(int $themeId): int
     {
-        return (int) Database::scalar('SELECT COUNT(*) FROM research_calls WHERE research_theme_id = ?', [$themeId]);
+        return (int) Database::scalar('SELECT COUNT(*) FROM research_call_themes WHERE theme_id = ?', [$themeId])
+            + (int) Database::scalar('SELECT COUNT(*) FROM research_calls WHERE research_theme_id = ? AND id NOT IN (SELECT call_id FROM research_call_themes)', [$themeId]);
     }
 }

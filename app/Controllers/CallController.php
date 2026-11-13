@@ -56,10 +56,10 @@ final class CallController
             Session::flash('error', implode(' ', $errors));
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
-        // Every call must state its research theme (§20).
-        $themeId = (int) ($_POST['theme'] ?? 0);
-        if ($themeId === 0 || Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ?', [$themeId]) == 0) {
-            Session::flash('error', 'Please select the research theme for this call.');
+        // A call may be associated with multiple global themes.
+        $themeIds = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['themes'] ?? [])))));
+        if ($themeIds === []) {
+            Session::flash('error', 'Select at least one research theme for this call.');
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
         $data = [
@@ -69,17 +69,18 @@ final class CallController
             'research_priorities' => trim((string) ($_POST['priorities'] ?? '')) ?: null,
             'opens_at'         => ($_POST['opens_at'] ?? '') ?: null,
             'closes_at'        => ($_POST['closes_at'] ?? '') ?: null,
-            'research_theme_id' => (int) ($_POST['theme'] ?? 0) ?: null,
         ];
         try {
             if ($id > 0) {
                 CallModel::update($id, $data);
+                CallModel::setThemes($id, $themeIds);
                 Audit::log('call.updated', 'research_call', $id);
                 Session::flash('success', 'Call updated.');
             } else {
                 $data['call_number'] = NumberingService::next('research_call');
                 $data['created_by']  = Auth::id();
                 $id = CallModel::create($data);
+                CallModel::setThemes($id, $themeIds);
                 Audit::log('call.created', 'research_call', $id, null, ['title' => $data['title']]);
                 Session::flash('success', 'Call created as draft.');
             }

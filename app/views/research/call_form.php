@@ -2,7 +2,7 @@
 
 <div class="page-head">
   <div><h1><?= $call === null ? 'New research call' : 'Edit: ' . e($call['title']) ?></h1>
-  <p>Basic call information. Eligibility, documents and criteria are configured on the call page after saving.</p></div>
+  <p>Basic call information. Associate one or more university-wide research themes with this call.</p></div>
 </div>
 
 <form method="post" action="<?= e(url('action=call_save')) ?>">
@@ -16,13 +16,16 @@
       <div><label>Reference number <span class="req">*</span></label><input type="text" name="reference_number" required maxlength="60" value="<?= e($call['reference_number'] ?? '') ?>"></div>
     </div>
     <div class="form-row">
-      <div><label></label>
-        <select name="theme" required>
-          <option value="">— select research theme —</option>
+      <div><div><label>Research themes <span class="req">*</span></label>
+        <select name="themes[]" multiple required size="6" style="min-height:150px;">
+          <?php $selectedThemeIds = array_map(static fn($t) => (int) $t['id'], $selectedThemes ?? []); ?>
+          <?php if (empty($selectedThemeIds) && !empty($call['research_theme_id'])) $selectedThemeIds = [(int) $call['research_theme_id']]; ?>
           <?php foreach ($themes as $t): ?>
-          <option value="<?= (int) $t['id'] ?>" <?= (int) ($call['research_theme_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['name']) ?></option>
+          <?php if (($t['status'] ?? 'active') === 'active' || in_array((int) $t['id'], $selectedThemeIds, true)): ?>
+          <option value="<?= (int) $t['id'] ?>" <?= in_array((int) $t['id'], $selectedThemeIds, true) ? 'selected' : '' ?>><?= e($t['name']) ?></option>
+          <?php endif; ?>
           <?php endforeach; ?>
-        </select></div>
+        </select><small class="muted">Hold Ctrl (Windows) or Command (Mac) to select multiple themes.</small></div>
     </div>
     <label>Description</label>
     <textarea name="description"><?= e($call['description'] ?? '') ?></textarea>

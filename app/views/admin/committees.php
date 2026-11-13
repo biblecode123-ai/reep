@@ -39,7 +39,7 @@
       <select name="college_id"><option value="">University-wide</option>
         <?php foreach ($colleges as $c): ?><option value="<?= (int) $c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?>
       </select>
-      <label>Quorum size (optional — POLICY DECISION REP-1)</label>
+      <label>Advisory meeting quorum (optional; never gates decisions or reports)</label>
       <input type="number" name="quorum_size" min="1">
       <label>Description</label><input type="text" name="description" maxlength="255">
       <div class="form-actions"><button class="btn" type="submit">Save committee</button></div>

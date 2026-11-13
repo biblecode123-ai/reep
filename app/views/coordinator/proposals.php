@@ -222,10 +222,10 @@ $eligibilityOptions = [
     <tbody>
       <?php foreach ($proposals as $p): ?>
         <?php
-        $required = (int) ($p['required_evaluators'] ?? 2);
+        $required = 2;
         $assigned = (int) $p['assigned_evaluators'];
         $completed = (int) $p['submitted_evaluations'];
-        $progress = $required > 0 ? min(100, round(($completed / $required) * 100)) : 0;
+        $progress = min(100, round(($completed / $required) * 100));
         ?>
         <tr>
           <td><?= e($p['application_number']) ?></td>
@@ -239,7 +239,7 @@ $eligibilityOptions = [
               <div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden;">
                 <div style="height:100%;background:var(--brand);width:<?= $progress ?>%;"></div>
               </div>
-              <span style="font-size:12px;"><?= $completed ?>/<?= $required ?> completed</span>
+              <span style="font-size:12px;"><?= $completed ?>/2 minimum completed</span>
             </div>
             <?php if ($p['evaluation_deadline']): ?>
               <div style="font-size:11px;color:var(--muted);">Deadline: <?= e(format_date($p['evaluation_deadline'])) ?></div>

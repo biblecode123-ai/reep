@@ -1,33 +1,30 @@
 <?php $title = 'Research Director Dashboard'; include APP_PATH . '/views/partials/header.php'; ?>
 
-<div class="page-head">
+<div class="page-head director-page-head">
     <div>
-        <h1>Research Director Dashboard</h1>
-        <p>University research governance and monitoring.</p>
+        <p class="eyebrow">RESEARCH, PUBLICATION, ETHICS &amp; EXTENSION</p>
+        <h1>Research office overview</h1>
+        <p>Priority decisions, active calls, and project follow-through in one place.</p>
     </div>
+    <div class="director-date" aria-label="Current date"><?= e(date('F j, Y')) ?></div>
 </div>
 
-<!-- 1. Dashboard Summary Cards -->
-<div class="grid grid-4">
+<section class="grid grid-4 director-summary-grid" aria-label="Research office priorities">
 <?php foreach ([
-  ['Active Research Calls', $stats['activeCalls'], 'calls_public'],
-  ['Awaiting Committee Assignment', $stats['awaitingCommitteeAssignment'], 'applications'],
-  ['University Evaluations In Progress', $stats['univEvaluationsInProgress'], 'applications'],
-  ['Completed Awaiting Decision', $stats['completedAwaitingDecision'], 'applications'],
-  ['Funding Decisions Pending', $stats['fundingDecisionsPending'], 'applications'],
-  ['Open Budget Appeals', $stats['openBudgetAppeals'], 'appeals'],
-  ['Open Rejected Appeals', $stats['openRejectedAppeals'], 'appeals'],
-  ['Appeals Awaiting Committee', $stats['appealsAwaitingCommittee'], 'appeals'],
-  ['Agreements Pending', $stats['agreementsPending'], 'agreements'],
-  ['Active Projects', $stats['activeProjectsAttention'], 'projects'],
-  ['Overdue Reports', $stats['overdueReports'], 'projects'],
-] as $c): ?>
-    <div class="stat">
-        <div class="num"><?= e($c[1]) ?></div>
-        <div class="lbl"><?= e($c[0]) ?></div>
-    </div>
+  ['Active calls', $stats['activeCalls'], 'calls_public'],
+  ['Awaiting evaluation assignment', $stats['awaitingCommitteeAssignment'], 'applications'],
+  ['Evaluations in progress', $stats['univEvaluationsInProgress'], 'applications'],
+  ['Decisions to record', $stats['completedAwaitingDecision'], 'applications'],
+  ['Funding to authorize', $stats['fundingDecisionsPending'], 'applications'],
+  ['Overdue project reports', $stats['overdueReports'], 'projects'],
+] as $index => $c): ?>
+    <a class="stat director-stat director-stat-<?= e((string) ($index + 1)) ?>" href="<?= e(url('action=' . $c[2])) ?>">
+        <span class="director-stat-label"><?= e($c[0]) ?></span>
+        <span class="director-stat-value"><?= e((string) $c[1]) ?></span>
+        <span class="director-stat-link">View queue <span aria-hidden="true">→</span></span>
+    </a>
 <?php endforeach; ?>
-</div>
+</section>
 
 <!-- 2. Priority Action Center -->
 <section>
@@ -60,39 +57,6 @@
                         <td><?= e(format_date($a['submitted_at'])) ?></td>
                         <td>
                             <a class="btn-sm" href="<?= e(url('action=app_committee_assign&id=' . $a['id'])) ?>">Assign Committee</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Committees Missing Required Members -->
-    <div class="card">
-        <h3 class="mt0">Committees Missing Required Members</h3>
-        <?php if (empty($committeesNeedingMembers)): ?>
-            <p class="muted">All committees have sufficient members.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Committee</th>
-                        <th>Type</th>
-                        <th>Current Members</th>
-                        <th>Required</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($committeesNeedingMembers as $c): ?>
-                    <tr>
-                        <td><?= e($c['name']) ?></td>
-                        <td><?= e($c['committee_type']) ?></td>
-                        <td><?= e($c['member_count']) ?></td>
-                        <td><?= e($c['quorum_size'] ?? 3) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=committee_members&id=' . $c['id'])) ?>">Manage Members</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>

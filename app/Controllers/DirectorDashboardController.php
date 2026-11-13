@@ -17,15 +17,15 @@ final class DirectorDashboardController
 
         // 1. Dashboard Summary Cards
         $stats = [
-            'activeCalls' => $scalar('SELECT COUNT(*) FROM research_calls WHERE status IN ("open","active")'),
-            'awaitingCommitteeAssignment' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code IN ("SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION")'),
+            'activeCalls' => $scalar('SELECT COUNT(*) FROM research_calls WHERE status = "open"'),
+            'awaitingCommitteeAssignment' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code = "SUBMITTED_TO_RPEE"'),
             'univEvaluationsInProgress' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code = "UNDER_UNIVERSITY_EVALUATION"'),
             'completedAwaitingDecision' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code IN ("AWAITING_UNIVERSITY_DECISION","AWAITING_COMMITTEE_DECISION")'),
             'fundingDecisionsPending' => $scalar('SELECT COUNT(*) FROM research_applications WHERE status_code IN ("AWAITING_FUNDING_DECISION","FUNDING_PENDING")'),
             'openBudgetAppeals' => $scalar('SELECT COUNT(*) FROM appeals WHERE appealable_type = "budget" AND status IN ("submitted","under_review")'),
             'openRejectedAppeals' => $scalar('SELECT COUNT(*) FROM appeals WHERE appealable_type = "rejection" AND status IN ("submitted","under_review")'),
             'appealsAwaitingCommittee' => $scalar('SELECT COUNT(*) FROM appeals WHERE status = "submitted"'),
-            'agreementsPending' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued","awaiting_signature")'),
+            'agreementsPending' => $scalar('SELECT COUNT(*) FROM research_agreements WHERE status IN ("draft","issued")'),
             'activeProjectsAttention' => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "ACTIVE"'),
             'reportingStats' => [
                 'expected' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status IN ("due","overdue")'),
@@ -33,7 +33,7 @@ final class DirectorDashboardController
                 'reviewed' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "reviewed"'),
                 'overdue' => $scalar('SELECT COUNT(*) FROM monthly_reports WHERE status = "overdue"'),
             ],
-            'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports WHERE status IN ("submitted","approved")'),
+            'overdueReports' => $scalar('SELECT COUNT(*) FROM progress_reports pr JOIN research_projects p ON p.id = pr.project_id WHERE p.status_code = "ACTIVE" AND pr.period_end < CURRENT_DATE AND pr.status NOT IN ("approved","reviewed")'),
         ];
 
         // 2. Priority Action Center - Proposals awaiting committee assignment
@@ -42,18 +42,8 @@ final class DirectorDashboardController
              FROM research_applications a
              JOIN users u ON u.id = a.pi_user_id
              LEFT JOIN colleges c ON c.id = a.college_id
-             WHERE a.status_code IN ("SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION")
+             WHERE a.status_code = "SUBMITTED_TO_RPEE"
              ORDER BY a.submitted_at DESC LIMIT 20'
-        );
-
-        // Committees missing required members
-        $committeesNeedingMembers = Database::all(
-            'SELECT c.id, c.name, c.code, c.committee_type, COUNT(cm.id) as member_count, c.quorum_size
-             FROM committees c
-             LEFT JOIN committee_members cm ON cm.committee_id = c.id AND cm.status = "active"
-             WHERE c.status = "active"
-             GROUP BY c.id
-             HAVING member_count < COALESCE(c.quorum_size, 3)'
         );
 
         // Evaluations approaching deadlines or (if deadline exists and is overdue)
@@ -112,7 +102,8 @@ final class DirectorDashboardController
              FROM research_projects p
              JOIN progress_reports pr ON pr.project_id = p.id
              WHERE p.status_code = "ACTIVE"
-             AND pr.status = "submitted"
+             AND pr.period_end < CURRENT_DATE
+             AND pr.status NOT IN ("approved","reviewed")
              ORDER BY pr.period_end ASC LIMIT 20'
         );
 
@@ -186,14 +177,13 @@ final class DirectorDashboardController
             'SELECT al.id, al.action, al.entity_type, al.entity_id, al.created_at, u.full_name as actor_name
              FROM audit_logs al
              LEFT JOIN users u ON u.id = al.user_id
-             WHERE al.action IN ("committee.assigned","evaluation.submitted","decision.recorded","budget.approved","appeal.submitted","agreement.issued","agreement.signed","project.activated","report.submitted")
+             WHERE al.action NOT IN ("auth.login","auth.logout")
              ORDER BY al.created_at DESC LIMIT 20'
         );
 
         $data = compact(
             'stats',
             'pendingCommitteeAssignment',
-            'committeesNeedingMembers',
             'overdueEvaluations',
             'completedAwaitingDecision',
             'fundingDecisionsPending',

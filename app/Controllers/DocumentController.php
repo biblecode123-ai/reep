@@ -76,8 +76,14 @@ final class DocumentController
         $userId = Auth::id();
         switch ($entityType) {
             case 'research_application':
-                return (bool) Database::scalar('SELECT COUNT(*) FROM research_applications WHERE id = ? AND (pi_user_id = ? OR ? IN (SELECT user_id FROM user_roles))',
-                    [$entityId, $userId, $userId]) || Gate::allows('research.manage');
+                return (bool) Database::scalar(
+                    'SELECT COUNT(*) FROM research_applications a
+                     WHERE a.id = ? AND (a.pi_user_id = ? OR EXISTS (
+                       SELECT 1 FROM application_team_members m
+                       WHERE m.application_id = a.id AND m.user_id = ? AND m.status <> "declined"
+                     ))',
+                    [$entityId, $userId, $userId]
+                ) || Gate::allows('research.manage');
             case 'research_project':
                 // The PI and active team members attach deliverables (§4) —
                 // e.g. progress/final reports — to their own project.

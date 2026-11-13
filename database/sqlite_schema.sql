@@ -143,6 +143,7 @@ CREATE TABLE roles (
     name         TEXT NOT NULL,
     display_name TEXT NOT NULL,
     description  TEXT NULL,
+    role_type    TEXT CHECK (role_type IN ('primary','assignment')) NOT NULL DEFAULT 'assignment',
     is_system    INTEGER NOT NULL DEFAULT 0,
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_roles_name UNIQUE (name)
@@ -169,9 +170,49 @@ CREATE TABLE user_roles (
     assigned_by INTEGER NULL,
     assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (user_id, role_id),
+    CONSTRAINT uq_user_primary_role UNIQUE (user_id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE user_responsibilities (
+    user_id     INTEGER NOT NULL,
+    role_id     INTEGER NOT NULL,
+    assigned_by INTEGER NULL,
+    assigned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (assigned_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE user_permission_grants (
+    user_id        INTEGER NOT NULL,
+    permission_id  INTEGER NOT NULL,
+    granted_by     INTEGER NULL,
+    source_role_id INTEGER NULL,
+    granted_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, permission_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions (id) ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (granted_by) REFERENCES users (id) ON DELETE SET NULL ON UPDATE CASCADE,
+    FOREIGN KEY (source_role_id) REFERENCES roles (id) ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+CREATE TABLE user_role_migration_archive (
+    user_id     INTEGER NOT NULL,
+    role_id     INTEGER NOT NULL,
+    assigned_by INTEGER NULL,
+    assigned_at DATETIME NULL,
+    migrated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role_id)
+);
+
+CREATE TABLE user_role_migration_users (
+    user_id     INTEGER NOT NULL,
+    migrated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id)
 );
 
 CREATE TABLE password_resets (

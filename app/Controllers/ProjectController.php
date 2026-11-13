@@ -189,13 +189,13 @@ final class ProjectController
         // every project's confidential progress, budget, and attachments.
         $isPi = (int) $project['pi_user_id'] === Auth::id();
         $isMember = $isPi || ProjectModel::isMember($id, Auth::id());
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         $isSameCollegeCoordinator = $isCoordinator
             && (int) (Auth::user()['college_id'] ?? 0) > 0
             && (int) (Auth::user()['college_id'] ?? 0) === (int) $project['college_id'];
         // Technical system administrators and committee reviewers do not
         // automatically receive institution-wide project access.
-        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer');
         $isInstitutionalManager = $isDirectorateOfficer
             && (Gate::allows('research.manage') || Gate::allows('project.activate'));
         if (!$isMember && !$isSameCollegeCoordinator && !$isInstitutionalManager) {

@@ -74,6 +74,13 @@ final class ApplicationController
             $openCalls[] = $call;
         }
         $themes = \App\Models\OrgModel::themes();
+        $callThemeMap = [];
+        foreach ($openCalls as $callOption) {
+            $callThemeMap[(int) $callOption['id']] = array_map(
+                static fn(array $theme): int => (int) $theme['id'],
+                CallModel::themes((int) $callOption['id'])
+            );
+        }
         $types = \App\Models\OrgModel::types();
         $workPlan = $id ? ApplicationModel::workPlan($id) : [];
         $appTeamMembers = [];
@@ -167,11 +174,19 @@ final class ApplicationController
             redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
         }
         $researchThemeId = (int) ($data['research_theme_id'] ?? 0);
-        if ($researchThemeId > 0 && (int) Database::scalar(
-            'SELECT COUNT(*) FROM research_themes WHERE id = ? AND is_active = 1',
-            [$researchThemeId]
-        ) !== 1) {
-            Session::flash('error', 'Select a valid active research theme.');
+        $themeBelongsToCall = $researchThemeId > 0 && (int) Database::scalar(
+            'SELECT COUNT(*) FROM research_themes t
+             WHERE t.id = ? AND t.status = 'active' AND (
+                EXISTS (SELECT 1 FROM research_call_themes ct WHERE ct.call_id = ? AND ct.theme_id = t.id)
+                OR (
+                    NOT EXISTS (SELECT 1 FROM research_call_themes ct WHERE ct.call_id = ?)
+                    AND EXISTS (SELECT 1 FROM research_calls c WHERE c.id = ? AND c.research_theme_id = t.id)
+                )
+             )',
+            [$researchThemeId, (int) $call['id'], (int) $call['id'], (int) $call['id']]
+        ) === 1;
+        if (!$themeBelongsToCall) {
+            Session::flash('error', 'Choose one active theme associated with the selected research call.');
             redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . $call['id']));
         }
         if ($data['duration_months'] !== null && ((int) $data['duration_months'] < 1
@@ -299,14 +314,14 @@ final class ApplicationController
                AND status NOT IN ("conflict_declared", "declined", "cancelled")',
             [$id, Auth::id()]
         );
-        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+        $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
         $isSameCollegeCoordinator = $isCoordinator
             && (int) (Auth::user()['college_id'] ?? 0) > 0
             && (int) (Auth::user()['college_id'] ?? 0) === (int) $app['college_id'];
         // Only designated Directorate officers have institution-wide access.
         // Committee members must rely on an explicit committee assignment;
         // the broad research.review permission alone is not an entity grant.
-        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer');
         $isInstitutionalReviewer = $isDirectorateOfficer && Gate::allows('research.review');
         $canManage = $isDirectorateOfficer && Gate::allows('research.manage');
         $committeeAssignment = \App\Models\CommitteeModel::activeAssignment($id);
@@ -529,7 +544,7 @@ final class ApplicationController
         }
         // College scoping (§5): coordinators may only request revisions on
         // their own college's research (Rule 5 layer).
-        if ((Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator'))
+        if ((Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator'))
             && Gate::denies('research.manage')
             && (int) (Auth::user()['college_id'] ?? 0) !== (int) $app['college_id']) {
             Session::flash('error', 'You cannot manage research belonging to another college (§5).');

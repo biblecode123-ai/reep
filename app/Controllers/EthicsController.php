@@ -226,8 +226,8 @@ final class EthicsController
         $reviewers = Database::all(
             'SELECT DISTINCT u.id, u.full_name, u.email, d.name AS department_name
              FROM users u
-             JOIN user_roles ur ON ur.user_id = u.id
-             JOIN roles r ON r.id = ur.role_id
+             JOIN user_responsibilities ur ON ur.user_id = u.id
+             JOIN roles r ON r.id = ur.role_id AND r.role_type = 'assignment'
              LEFT JOIN departments d ON d.id = u.department_id
              WHERE r.name IN ("ethics_reviewer", "ethics_member") AND u.status = "active"
              ORDER BY u.full_name'

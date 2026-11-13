@@ -11,7 +11,8 @@
       <dt>Employee ID</dt><dd><?= e($user['employee_id'] ?? '—') ?></dd>
       <dt>College</dt><dd><?= e($user['college_name'] ?? '—') ?></dd>
       <dt>Department</dt><dd><?= e($user['department_name'] ?? '—') ?></dd>
-      <dt>Roles</dt><dd><?= e(implode(', ', array_column($roles, 'display_name'))) ?></dd>
+      <dt>Account category</dt><dd><?= e(implode(', ', array_column($roles, 'display_name')) ?: 'Not assigned') ?></dd>
+      <dt>Responsibilities</dt><dd><?= e(implode(', ', array_column($responsibilities, 'display_name')) ?: 'None assigned') ?></dd>
       <dt>Last login</dt><dd><?= e(format_datetime($user['last_login_at'])) ?></dd>
     </dl>
     <?php if (\App\Core\Gate::allows('researcher.view')): ?>

@@ -47,10 +47,9 @@ final class FinalReportController
     private static function evaluatorHasRole(int $userId): bool
     {
         return (int) Database::scalar(
-            'SELECT COUNT(*) FROM user_roles ur
-             JOIN roles r ON r.id = ur.role_id
-             JOIN users u ON u.id = ur.user_id
-             WHERE ur.user_id = ? AND r.name = "evaluator" AND u.status = "active"',
+            'SELECT COUNT(*) FROM research_evaluators re
+             JOIN users u ON u.id = re.user_id
+             WHERE re.user_id = ? AND u.status = "active"',
             [$userId]
         ) > 0;
     }
@@ -163,7 +162,7 @@ final class FinalReportController
             redirect('index.php?action=final_report_view&id=' . $reportId);
         }
 
-        $required = max(1, Settings::int('college_evaluators_default', 1));
+        $required = max(2, Settings::int('college_evaluators_default', 2));
         $counts = FinalReportModel::assignmentCounts($reportId, 'college');
         $needed = max(0, $required - $counts['required']);
         $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['evaluator_ids'] ?? [])))));
@@ -219,7 +218,7 @@ final class FinalReportController
             redirect('index.php?action=final_report_view&id=' . $reportId);
         }
 
-        $required = max(1, Settings::int('university_evaluators_default', 1));
+        $required = max(2, Settings::int('university_evaluators_default', 2));
         $counts = FinalReportModel::assignmentCounts($reportId, 'university');
         $needed = max(0, $required - $counts['required']);
         $ids = array_values(array_unique(array_filter(array_map('intval', (array) ($_POST['evaluator_ids'] ?? [])))));
@@ -429,31 +428,19 @@ final class FinalReportController
             });
 
             $counts = FinalReportModel::assignmentCounts((int) $report['id'], $level);
-            if ($counts['required'] > 0 && $counts['completed'] >= $counts['required']) {
+            $minimumEvaluations = max(2, Settings::int('final_report_evaluators_minimum', 2));
+            if ($counts['completed'] >= $minimumEvaluations) {
                 $average = FinalReportModel::average((int) $report['id'], $level);
-                $thresholdKey = $level === 'college' ? 'college_report_passing_score' : 'university_report_passing_score';
-                $threshold = max(0.0, min(100.0, (float) Settings::get($thresholdKey, '50')));
-                if ($level === 'college') {
-                    $status = $average !== null && $average >= $threshold ? 'college_passed' : 'college_revision_required';
-                    Database::update('project_final_reports', [
-                        'college_average_score' => $average,
-                        'status' => $status,
-                    ], 'id = ?', [(int) $report['id']]);
-                    NotificationService::send((int) $report['pi_user_id'], 'final_report_college_result',
-                        'College completed-report evaluation completed',
-                        $status === 'college_passed' ? 'Your completed report passed college evaluation.' : 'Your completed report requires revision after college evaluation.',
-                        'index.php?action=final_report_view&id=' . (int) $report['id'], 'high');
-                } else {
-                    $status = $average !== null && $average >= $threshold ? 'university_passed' : 'university_revision_required';
-                    Database::update('project_final_reports', [
-                        'university_average_score' => $average,
-                        'status' => $status,
-                    ], 'id = ?', [(int) $report['id']]);
-                    NotificationService::send((int) $report['pi_user_id'], 'final_report_university_result',
-                        'University completed-report evaluation completed',
-                        $status === 'university_passed' ? 'Your completed report passed university evaluation and is awaiting the Director decision.' : 'Your completed report requires revision after university evaluation.',
-                        'index.php?action=final_report_view&id=' . (int) $report['id'], 'high');
-                }
+                $status = $level === 'college' ? 'college_passed' : 'university_passed';
+                $scoreColumn = $level === 'college' ? 'college_average_score' : 'university_average_score';
+                Database::update('project_final_reports', [
+                    $scoreColumn => $average,
+                    'status' => $status,
+                ], 'id = ?', [(int) $report['id']]);
+                NotificationService::send((int) $report['pi_user_id'], 'final_report_' . $level . '_result',
+                    ucfirst($level) . ' completed-report evaluation completed',
+                    'The minimum independent evaluations are complete. The average score is advisory; the report can advance to the next review stage.',
+                    'index.php?action=final_report_view&id=' . (int) $report['id'], 'high');
             }
 
             Audit::log('final_report.evaluation_submitted', 'project_final_report', (int) $report['id'], null, [
@@ -514,11 +501,6 @@ final class FinalReportController
             redirect('index.php?action=final_report_view&id=' . $reportId);
         }
         $average = FinalReportModel::average($reportId, 'university');
-        $threshold = max(0.0, min(100.0, (float) Settings::get('university_report_passing_score', '50')));
-        if ($average === null || ($decision === 'approve' && $average < $threshold)) {
-            Session::flash('error', 'The university completed-report average is below the Director-configured passing threshold.');
-            redirect('index.php?action=final_report_view&id=' . $reportId);
-        }
 
         Database::transaction(function () use ($reportId, $decision, $comments, $average, $report): void {
             FinalReportModel::recordDecision($reportId, 'directorate', $decision, $comments, Auth::id());
@@ -554,8 +536,7 @@ final class FinalReportController
     {
         $sql = 'SELECT u.id, u.full_name, u.email, u.college_id
                 FROM users u
-                JOIN user_roles ur ON ur.user_id = u.id
-                JOIN roles r ON r.id = ur.role_id AND r.name = "evaluator"
+                JOIN research_evaluators re ON re.user_id = u.id
                 WHERE u.status = "active" AND u.id <> ?
                   AND NOT EXISTS (
                     SELECT 1 FROM research_project_members pm
@@ -588,7 +569,7 @@ final class FinalReportController
         $isPi = (int) $report['pi_user_id'] === $userId;
         $isTeam = self::isProjectTeamMember((int) $report['project_id'], $userId);
         $isCoordinator = Gate::hasRole('college_coordinator') && (int) (Auth::user()['college_id'] ?? 0) === (int) $report['college_id'];
-        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+        $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer');
         $isDirector = Gate::hasRole('rpee_director');
         $userAssignment = FinalReportModel::assignmentForUser($reportId, $userId);
         $isAssigned = $userAssignment !== null

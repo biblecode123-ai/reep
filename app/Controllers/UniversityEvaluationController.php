@@ -43,20 +43,6 @@ final class UniversityEvaluationController
             redirect('index.php?action=application_view&id=' . $appId);
         }
         
-        $collegeScore = Database::scalar(
-            'SELECT AVG(weighted_score) FROM evaluations e
-             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
-             WHERE e.application_id = ? AND e.status = "submitted"
-               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"',
-            [$appId]
-        );
-        $passingScore = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
-
-        if ($collegeScore === null || (float) $collegeScore < $passingScore) {
-            Session::flash('error', 'Proposal did not pass college evaluation.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
-
         $evaluators = Database::all('SELECT u.id, u.full_name FROM users u JOIN research_evaluators re ON re.user_id = u.id WHERE re.availability_status = "available"');
         $assignments = Database::all('SELECT evaluator_user_id FROM evaluator_assignments WHERE application_id = ? AND assignment_level = "university" AND is_active = 1', [$appId]);
         $assignedIds = array_column($assignments, 'evaluator_user_id');
@@ -80,23 +66,10 @@ final class UniversityEvaluationController
             Session::flash('error', 'Only college-endorsed proposals in the university evaluator assignment stage can be assigned.');
             redirect('index.php?action=application_view&id=' . $appId);
         }
-        $collegeScore = Database::scalar(
-            'SELECT AVG(e.weighted_score) FROM evaluations e
-             JOIN evaluator_assignments ea ON ea.id = e.assignment_id
-             WHERE e.application_id = ? AND e.status = "submitted"
-               AND e.evaluation_type = "proposal" AND ea.assignment_level = "college"',
-            [$appId]
-        );
-        $passingScore = max(0.0, min(100.0, (float) Settings::get('college_proposal_passing_score', '50')));
-        if ($collegeScore === null || (float) $collegeScore < $passingScore) {
-            Session::flash('error', 'The college proposal evaluation has not met the configured passing threshold.');
-            redirect('index.php?action=application_view&id=' . $appId);
-        }
-
-        $required = max(1, Settings::int('university_evaluators_default', 1));
+        $required = max(2, Settings::int('university_evaluators_default', 2));
         $evaluators = array_values(array_unique(array_filter(array_map('intval', $evaluators), static fn(int $id): bool => $id > 0)));
-        if (count($evaluators) !== $required) {
-            Session::flash('error', "Assign exactly {$required} university evaluator(s), based on the current Directorate setting.");
+        if (count($evaluators) < $required) {
+            Session::flash('error', "Assign at least {$required} university evaluators, based on the current Directorate setting.");
             redirect('index.php?action=application_view&id=' . $appId);
         }
 

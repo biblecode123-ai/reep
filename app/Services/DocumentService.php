@@ -298,7 +298,7 @@ final class DocumentService
                 'SELECT college_id FROM research_applications WHERE id = ?',
                 [$applicationId]
             );
-            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
             if ($isCoordinator && !Gate::allows('research.manage')) {
                 $user = Auth::user();
                 return $college !== null && $user !== null
@@ -309,7 +309,7 @@ final class DocumentService
 
             // Only Directorate officers receive institution-wide reviewer access.
             // A committee member must have an active assignment to THIS application.
-            $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer');
+            $isDirectorateOfficer = Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer');
             if ($isDirectorateOfficer && Gate::allows('research.review', 'research.screen', 'research.manage')) {
                 return true;
             }
@@ -337,13 +337,13 @@ final class DocumentService
 
             $college = Database::scalar('SELECT college_id FROM research_projects WHERE id = ?', [$projectId]);
             $user = Auth::user();
-            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasRole('dept_coordinator');
+            $isCoordinator = Gate::hasRole('college_coordinator') || Gate::hasResponsibility('dept_coordinator');
             if ($isCoordinator && Gate::allows('research.screen') && $college !== null
                 && $user !== null && (int) ($user['college_id'] ?? 0) === (int) $college) {
                 return true;
             }
 
-            return (Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer'))
+            return (Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer'))
                 && Gate::allows('research.manage', 'research.review');
         }
 
@@ -361,7 +361,7 @@ final class DocumentService
             );
             return $rev || Gate::allows('ethics.manage');
         }
-        return Gate::allows('research.manage') && (Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer'));
+        return Gate::allows('research.manage') && (Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer'));
     }
 
     private static function userInCollegeOfEntity(array $doc): bool

@@ -24,7 +24,11 @@ final class ProfileController
             [$userId]
         );
         $roles = Database::all(
-            'SELECT r.display_name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ?',
+            "SELECT r.display_name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.role_type = 'primary'",
+            [$userId]
+        );
+        $responsibilities = Database::all(
+            "SELECT r.display_name FROM user_responsibilities ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ? AND r.role_type = 'assignment' ORDER BY r.display_name",
             [$userId]
         );
         $forcePassword = (string) ($_GET['force_password'] ?? '') === '1';

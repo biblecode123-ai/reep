@@ -63,7 +63,7 @@ final class ResearcherPolicy
     /** Whether the current user is Research Directorate staff (director or RPEE officer) or admin. */
     public static function isDirectorate(): bool
     {
-        return Gate::hasRole('rpee_director') || Gate::hasRole('rpee_officer') || Gate::isAdmin();
+        return Gate::hasRole('rpee_director') || Gate::hasResponsibility('rpee_officer') || Gate::isAdmin();
     }
 
     /**

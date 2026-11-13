@@ -16,7 +16,7 @@
     <div class="form-row">
       <div>
         <label>Call <span class="req">*</span></label>
-        <select name="call_id" required <?= $app !== null ? 'disabled' : '' ?>>
+        <select name="call_id" id="application-call" required <?= $app !== null ? 'disabled' : '' ?>>
           <option value="">— select call —</option>
           <?php foreach ($openCalls as $c): ?>
           <option value="<?= (int) $c['id'] ?>" <?= (int) ($app['call_id'] ?? ($_GET['call_id'] ?? 0)) === (int) $c['id'] ? 'selected' : '' ?>>
@@ -43,12 +43,14 @@
     </div>
     <div class="form-row">
       <div><label>Research theme</label>
-        <select name="research_theme_id">
-          <option value="">—</option>
+        <select name="research_theme_id" id="application-theme" required>
+          <option value="">— choose a theme for this call —</option>
           <?php foreach ($themes as $t): ?>
-          <option value="<?= (int) $t['id'] ?>" <?= (int) ($app['research_theme_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['name']) ?></option>
+          <?php $eligibleCallIds = []; foreach ($callThemeMap as $mapCallId => $themeIds) { if (in_array((int) $t['id'], $themeIds, true)) { $eligibleCallIds[] = $mapCallId; } } ?>
+          <option value="<?= (int) $t['id'] ?>" data-call-ids="<?= e(implode(',', $eligibleCallIds)) ?>" <?= (int) ($app['research_theme_id'] ?? 0) === (int) $t['id'] ? 'selected' : '' ?>><?= e($t['name']) ?></option>
           <?php endforeach; ?>
         </select>
+        <span class="field-hint">Choose exactly one active theme assigned to the selected call.</span>
       </div>
       <div><label>Requires ethical review? (§30)</label>
         <select name="requires_ethics">
@@ -147,5 +149,27 @@
     <a class="btn btn-outline" href="<?= e(url('action=applications')) ?>">Cancel</a>
   </div>
 </form>
+
+<script>
+  (() => {
+    const callSelect = document.getElementById('application-call');
+    const themeSelect = document.getElementById('application-theme');
+    if (!callSelect || !themeSelect) return;
+
+    const filterThemes = () => {
+      const callId = callSelect.value;
+      for (const option of themeSelect.options) {
+        if (!option.value) continue;
+        const allowedCalls = (option.dataset.callIds || '').split(',').filter(Boolean);
+        option.disabled = !allowedCalls.includes(callId);
+        option.hidden = option.disabled;
+        if (option.selected && option.disabled) themeSelect.value = '';
+      }
+    };
+
+    callSelect.addEventListener('change', filterThemes);
+    filterThemes();
+  })();
+</script>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>

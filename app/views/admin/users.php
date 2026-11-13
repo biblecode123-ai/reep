@@ -1,7 +1,7 @@
 <?php $title = 'Users'; include APP_PATH . '/views/partials/header.php'; ?>
 
 <div class="page-head">
-  <div><h1>Users</h1><p>Manage institutional users and their roles (§10)</p></div>
+  <div><h1>Users</h1><p>Manage the four account categories and separately assigned responsibilities.</p></div>
   <?php if (Gate::allows('user.manage')): ?><a class="btn" href="<?= e(url('action=user_form')) ?>">New user</a><?php endif; ?>
 </div>
 
@@ -33,14 +33,17 @@
 </form>
 
 <table class="tbl">
-  <tr><th>Name</th><th>Employee ID</th><th>Email</th><th>College / Dept</th><th>Roles</th><th>Status</th><th class="actions">Actions</th></tr>
+  <tr><th>Name</th><th>Employee ID</th><th>Email</th><th>College / Dept</th><th>Account category &amp; responsibilities</th><th>Status</th><th class="actions">Actions</th></tr>
   <?php foreach ($rows as $u): ?>
   <tr>
     <td><?= e($u['full_name']) ?></td>
     <td><?= e($u['employee_id'] ?? '—') ?></td>
     <td><?= e($u['email']) ?></td>
     <td><?= e($u['college_name'] ?? '—') ?> / <?= e($u['department_name'] ?? '—') ?></td>
-    <td style="max-width:260px;font-size:13px;"><?= e($u['role_names'] ?? '—') ?></td>
+    <td style="max-width:320px;font-size:13px;">
+      <strong><?= e($u['role_names'] ?: 'No category') ?></strong>
+      <?php if (!empty($u['responsibility_names'])): ?><div class="muted" style="margin-top:4px;"><?= e($u['responsibility_names']) ?></div><?php endif; ?>
+    </td>
     <td><span class="badge <?= $u['status'] === 'active' ? 'badge-success' : 'badge-secondary' ?>"><?= e(ucfirst($u['status'])) ?></span></td>
     <td class="actions">
       <?php if (Gate::allows('user.manage')): ?>
@@ -57,7 +60,7 @@
         </form>
       <?php endif; ?>
       <?php if (Gate::allows('user.roles')): ?>
-        <a class="btn btn-outline btn-sm" href="<?= e(url('action=user_roles&id=' . $u['id'])) ?>">Roles</a>
+        <a class="btn btn-outline btn-sm" href="<?= e(url('action=user_roles&id=' . $u['id'])) ?>">Access profile</a>
       <?php endif; ?>
     </td>
   </tr>

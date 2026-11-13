@@ -161,8 +161,8 @@ final class OrgModel
             'colleges'        => (int) Database::scalar('SELECT COUNT(*) FROM colleges WHERE status = "active"'),
             'departments'     => (int) Database::scalar('SELECT COUNT(*) FROM departments WHERE status = "active"'),
             'users'           => (int) Database::scalar('SELECT COUNT(*) FROM users WHERE status = "active"'),
-            'researchers'     => (int) Database::scalar('SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.name = "researcher"'),
-            'evaluators'      => (int) Database::scalar('SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.name = "evaluator"'),
+            'researchers'     => (int) Database::scalar("SELECT COUNT(*) FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.name = 'researcher' AND r.role_type = 'primary'"),
+            'evaluators'      => (int) Database::scalar('SELECT COUNT(*) FROM research_evaluators')
         ];
     }
 }

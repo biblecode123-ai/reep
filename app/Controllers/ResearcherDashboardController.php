@@ -114,7 +114,7 @@ final class ResearcherDashboardController
 
         // Pending Agreements
         $pendingAgreements = Database::all(
-            'SELECT ag.id, ag.version, ag.status, a.application_number, a.title
+            'SELECT ag.id, a.id AS application_id, ag.version, ag.status, a.application_number, a.title
              FROM research_agreements ag
              JOIN research_applications a ON a.id = ag.application_id
              WHERE a.pi_user_id = ? AND ag.status IN ("draft","issued")
@@ -124,7 +124,7 @@ final class ResearcherDashboardController
 
         // Pending Progress Reports
         $pendingReports = Database::all(
-            'SELECT pr.id, pr.report_number, p.project_number, p.title, pr.period_end, pr.status
+            'SELECT pr.id, p.id AS project_id, pr.report_number, p.project_number, p.title, pr.period_end, pr.status
              FROM progress_reports pr
              JOIN research_projects p ON p.id = pr.project_id
              JOIN research_project_members m ON m.project_id = p.id
@@ -135,7 +135,7 @@ final class ResearcherDashboardController
 
         // Overdue Reports
         $overdueReports = Database::all(
-            'SELECT pr.id, pr.report_number, p.project_number, p.title, pr.period_end, pr.status,
+            'SELECT pr.id, p.id AS project_id, pr.report_number, p.project_number, p.title, pr.period_end, pr.status,
                    julianday("now") - julianday(pr.period_end) as days_overdue
              FROM progress_reports pr
              JOIN research_projects p ON p.id = pr.project_id

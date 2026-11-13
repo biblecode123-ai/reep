@@ -17,12 +17,30 @@ $callFilter = $_GET['call_id'] ?? '';
 $deptFilter = $_GET['department_id'] ?? '';
 $statusFilter = $_GET['status'] ?? '';
 $eligibilityFilter = $_GET['eligibility'] ?? '';
+$navFilter = $_GET['filter'] ?? '';
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $perPage = 20;
 
 // Build query
 $where = ['a.college_id = ?'];
 $params = [$collegeId];
+
+// Support sidebar navigation preset filters (?filter=...)
+if (!empty($navFilter)) {
+    if ($navFilter === 'screening_needed') {
+        $where[] = 'a.status_code IN ("SUBMITTED","COLLEGE_RECEIVED","UNDER_COLLEGE_SCREENING","SUBMITTED_TO_RPEE","AWAITING_COLLEGE_REVISION")';
+    } elseif ($navFilter === 'needs_evaluators') {
+        $where[] = 'a.status_code = "EVALUATOR_ASSIGNMENT_PENDING"';
+    } elseif ($navFilter === 'under_evaluation') {
+        $where[] = 'a.status_code IN ("UNDER_COLLEGE_EVALUATION","UNDER_EVALUATION","EVALUATOR_ASSIGNED","EVALUATOR_ACCEPTED")';
+    } elseif ($navFilter === 'approved') {
+        $where[] = 'a.status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","APPROVED","FUNDED")';
+    } elseif ($navFilter === 'rejected') {
+        $where[] = 'a.status_code IN ("REJECTED_BY_COLLEGE","COLLEGE_REJECTED")';
+    } elseif ($navFilter === 'forwarded') {
+        $where[] = 'a.status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","FORWARDED_TO_UNIVERSITY","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","AWAITING_COMMITTEE_DECISION","APPROVED","FUNDED")';
+    }
+}
 
 if (!empty($search)) {
     $where[] = '(a.title LIKE ? OR a.application_number LIKE ? OR u.full_name LIKE ?)';
@@ -222,10 +240,10 @@ $eligibilityOptions = [
     <tbody>
       <?php foreach ($proposals as $p): ?>
         <?php
-        $required = (int) ($p['required_evaluators'] ?? 2);
         $assigned = (int) $p['assigned_evaluators'];
         $completed = (int) $p['submitted_evaluations'];
-        $progress = $required > 0 ? min(100, round(($completed / $required) * 100)) : 0;
+        $pending = max(0, $assigned - $completed);
+        $progress = $completed >= 2 ? 100 : (int) round(($completed / 2) * 100);
         ?>
         <tr>
           <td><?= e($p['application_number']) ?></td>
@@ -239,7 +257,7 @@ $eligibilityOptions = [
               <div style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden;">
                 <div style="height:100%;background:var(--brand);width:<?= $progress ?>%;"></div>
               </div>
-              <span style="font-size:12px;"><?= $completed ?>/<?= $required ?> completed</span>
+              <span style="font-size:12px;"><?= $completed ?> submitted<?= $pending > 0 ? ', ' . $pending . ' pending' : '' ?></span>
             </div>
             <?php if ($p['evaluation_deadline']): ?>
               <div style="font-size:11px;color:var(--muted);">Deadline: <?= e(format_date($p['evaluation_deadline'])) ?></div>

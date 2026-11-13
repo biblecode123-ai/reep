@@ -438,7 +438,11 @@ INSERT INTO system_settings (setting_key, setting_value, setting_group, value_ty
 ('notification_email_enabled', '0',                                    'notifications','boolean', 'Email dispatch (disabled by default)'),
 ('repository_public_visibility','university_only',                     'repository',   'string',  'Default visibility for new repository records'),
 ('evaluation_mode_default',    'single_blind',                         'research',     'string',  'Default evaluation mode (§24)'),
-('required_evaluators_default','2',                                    'research',     'integer', 'POLICY DECISION WF-2: default evaluator count'),
+('required_evaluators_default','1',                                    'research',     'integer', 'POLICY DECISION WF-2: default evaluator count'),
+('college_evaluators_default',  '1',                                    'research',     'integer', 'Default college evaluator count'),
+('university_evaluators_default','3',                                   'research',     'integer', 'Default university evaluator count'),
+('college_report_passing_score','50.00',                                'research',     'decimal', 'Default college report passing score'),
+('university_report_passing_score','50.00',                             'research',     'decimal', 'Default university report passing score'),
 ('budget_currency',            'ETB',                                  'budget',       'string',  'Budget currency code'),
 ('fiscal_year_start_month',    '7',                                    'general',      'integer', 'Ethiopian fiscal year start month'),
 ('timezone',                   'Africa/Addis_Ababa',                   'general',      'string',  'Application timezone');

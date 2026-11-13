@@ -23,6 +23,9 @@ final class ResearcherDashboardController
 
         // Dashboard Summary Cards
         $stats = [
+            'availableCalls' => $scalar(
+                'SELECT COUNT(*) FROM research_calls WHERE status IN ("published","open") AND (closes_at IS NULL OR closes_at >= date("now"))'
+            ),
             'draftProposals' => $scalar(
                 'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code = "DRAFT"',
                 [$userId]
@@ -31,42 +34,58 @@ final class ResearcherDashboardController
                 'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code NOT IN ("DRAFT","WITHDRAWN")',
                 [$userId]
             ),
+            'collegeScreening' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("SUBMITTED","COLLEGE_RECEIVED","UNDER_COLLEGE_SCREENING","EVALUATOR_ASSIGNMENT_PENDING")',
+                [$userId]
+            ),
+            'collegeEvaluating' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("UNDER_COLLEGE_EVALUATION","UNDER_EVALUATION","EVALUATOR_ASSIGNED","EVALUATOR_ACCEPTED")',
+                [$userId]
+            ),
+            'collegeApproved' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","APPROVED","FUNDED")',
+                [$userId]
+            ),
+            'collegeRejected' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("REJECTED_BY_COLLEGE","COLLEGE_REJECTED")',
+                [$userId]
+            ),
+            'universityReview' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","UNIVERSITY_COMMITTEE_REVIEW","AWAITING_COMMITTEE_DECISION")',
+                [$userId]
+            ),
             'underRevision' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code = "AWAITING_COLLEGE_REVISION"',
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("AWAITING_COLLEGE_REVISION","REVISION_REQUIRED","REVISION_REQUESTED")',
                 [$userId]
             ),
             'approvedProposals' => $scalar(
                 'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("APPROVED","FUNDED")',
                 [$userId]
             ),
+            'rejectedProposals' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code IN ("REJECTED","REJECTED_BY_COLLEGE","COLLEGE_REJECTED")',
+                [$userId]
+            ),
+            'pendingInvitations' => $scalar(
+                'SELECT COUNT(*) FROM application_team_members WHERE user_id = ? AND status = "invited"',
+                [$userId]
+            ),
+            'acceptedCollaborations' => $scalar(
+                'SELECT COUNT(*) FROM application_team_members WHERE user_id = ? AND status = "accepted"',
+                [$userId]
+            ),
+            'pendingEvaluations' => $scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments WHERE evaluator_user_id = ? AND status IN ("assigned","accepted") AND is_active = 1',
+                [$userId]
+            ),
+            'completedEvaluations' => $scalar(
+                'SELECT COUNT(*) FROM evaluations WHERE evaluator_user_id = ? AND status = "submitted"',
+                [$userId]
+            ),
             'activeProjects' => $scalar(
                 'SELECT COUNT(*) FROM research_projects p
                  JOIN research_project_members m ON m.project_id = p.id
                  WHERE m.user_id = ? AND m.status = "active" AND p.status_code = "ACTIVE"',
-                [$userId]
-            ),
-            'pendingAgreements' => $scalar(
-                'SELECT COUNT(*) FROM research_agreements ag
-                 JOIN research_applications a ON a.id = ag.application_id
-                 WHERE a.pi_user_id = ? AND ag.status IN ("draft","issued")',
-                [$userId]
-            ),
-            'pendingReports' => $scalar(
-                'SELECT COUNT(*) FROM progress_reports pr
-                 JOIN research_projects p ON p.id = pr.project_id
-                 JOIN research_project_members m ON m.project_id = p.id
-                 WHERE m.user_id = ? AND m.status = "active" AND pr.status = "submitted" AND pr.period_end >= date("now")',
-                [$userId]
-            ),
-            'overdueReports' => $scalar(
-                'SELECT COUNT(*) FROM progress_reports pr
-                 JOIN research_projects p ON p.id = pr.project_id
-                 JOIN research_project_members m ON m.project_id = p.id
-                 WHERE m.user_id = ? AND m.status = "active" AND pr.status = "submitted" AND pr.period_end < date("now")',
-                [$userId]
-            ),
-            'pendingEvaluations' => $scalar(
-                'SELECT COUNT(*) FROM evaluator_assignments WHERE evaluator_user_id = ? AND status IN ("assigned","accepted")',
                 [$userId]
             ),
         ];
@@ -169,6 +188,27 @@ final class ResearcherDashboardController
         // Open Calls
         $openCalls = CallModel::openCalls();
 
+        // Co-investigator invitations & collaborations
+        $coiInvitations = Database::all(
+            'SELECT atm.id, atm.application_id, atm.role, atm.invited_at, a.application_number, a.title as proposal_title, u.full_name as pi_name
+             FROM application_team_members atm
+             JOIN research_applications a ON a.id = atm.application_id
+             JOIN users u ON u.id = a.pi_user_id
+             WHERE atm.user_id = ? AND atm.status = "invited"
+             ORDER BY atm.invited_at DESC',
+            [$userId]
+        );
+
+        $collaborations = Database::all(
+            'SELECT atm.id, atm.application_id, atm.role, atm.joined_at, a.application_number, a.title as proposal_title, a.status_code, u.full_name as pi_name
+             FROM application_team_members atm
+             JOIN research_applications a ON a.id = atm.application_id
+             JOIN users u ON u.id = a.pi_user_id
+             WHERE atm.user_id = ? AND atm.status = "accepted"
+             ORDER BY atm.joined_at DESC',
+            [$userId]
+        );
+
         // Notifications
         $unread = NotificationService::unreadCount($userId);
         $notifications = Database::all(
@@ -190,6 +230,8 @@ final class ResearcherDashboardController
             'overdueReports' => $overdueReports,
             'pendingEvaluations' => $pendingEvaluations,
             'completedEvaluations' => $completedEvaluations,
+            'coiInvitations' => $coiInvitations,
+            'collaborations' => $collaborations,
             'openCalls' => $openCalls,
             'unread' => $unread,
             'notifications' => $notifications,

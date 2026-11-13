@@ -15,6 +15,18 @@ use App\Services\NumberingService;
 
 final class CallController
 {
+    public static function apiThemes(): void
+    {
+        $callId = (int) ($_GET['call_id'] ?? 0);
+        $themes = $callId > 0 ? CallModel::themesForCall($callId) : [];
+        if (empty($themes)) {
+            $themes = \App\Models\OrgModel::themes();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['themes' => $themes]);
+        exit;
+    }
+
     public static function index(): void
     {
         $page = max(1, (int) ($_GET['page'] ?? 1));
@@ -33,6 +45,10 @@ final class CallController
         Gate::authorize('research.manage');
         $id = (int) ($_GET['id'] ?? 0);
         $call = $id ? CallModel::find($id) : null;
+        $callThemes = $id ? array_column(CallModel::themesForCall($id), 'id') : [];
+        if ($id && empty($callThemes) && !empty($call['research_theme_id'])) {
+            $callThemes = [(int) $call['research_theme_id']];
+        }
         $eligibility = $id ? CallModel::eligibility($id) : [];
         $requirements = $id ? CallModel::requirements($id) : [];
         $criteria = $id ? CallModel::criteria($id) : [];
@@ -55,12 +71,14 @@ final class CallController
             Session::flash('error', implode(' ', $errors));
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
-        // Every call must state its research theme (§20).
-        $themeId = (int) ($_POST['theme'] ?? 0);
-        if ($themeId === 0 || Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ?', [$themeId]) == 0) {
-            Session::flash('error', 'Please select the research theme for this call.');
+        // Multiple global themes associated with this research call
+        $rawThemes = $_POST['themes'] ?? ($_POST['theme'] ?? []);
+        $themeIds = array_filter(array_map('intval', (array) $rawThemes));
+        if (empty($themeIds)) {
+            Session::flash('error', 'Please select at least one research theme for this call from the global catalogue.');
             redirect('index.php?action=call_form' . ($id ? '&id=' . $id : ''));
         }
+        $primaryThemeId = reset($themeIds);
         $data = [
             'title'            => $clean['title'],
             'reference_number' => $clean['reference_number'],
@@ -68,17 +86,19 @@ final class CallController
             'research_priorities' => trim((string) ($_POST['priorities'] ?? '')) ?: null,
             'opens_at'         => ($_POST['opens_at'] ?? '') ?: null,
             'closes_at'        => ($_POST['closes_at'] ?? '') ?: null,
-            'research_theme_id' => (int) ($_POST['theme'] ?? 0) ?: null,
+            'research_theme_id' => $primaryThemeId,
         ];
         try {
             if ($id > 0) {
                 CallModel::update($id, $data);
+                CallModel::setThemesForCall($id, $themeIds);
                 Audit::log('call.updated', 'research_call', $id);
                 Session::flash('success', 'Call updated.');
             } else {
                 $data['call_number'] = NumberingService::next('research_call');
                 $data['created_by']  = Auth::id();
                 $id = CallModel::create($data);
+                CallModel::setThemesForCall($id, $themeIds);
                 Audit::log('call.created', 'research_call', $id, null, ['title' => $data['title']]);
                 Session::flash('success', 'Call created as draft.');
             }

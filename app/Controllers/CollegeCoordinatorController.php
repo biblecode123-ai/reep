@@ -24,12 +24,20 @@ final class CollegeCoordinatorController
 
         // Dashboard Summary Cards
         $stats = [
+            'totalProposals' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ?',
+                [$collegeId]
+            ),
             'newSubmissions' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("SUBMITTED_TO_RPEE","AWAITING_COLLEGE_REVISION")',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("SUBMITTED","COLLEGE_RECEIVED","UNDER_COLLEGE_SCREENING","SUBMITTED_TO_RPEE","AWAITING_COLLEGE_REVISION")',
+                [$collegeId]
+            ),
+            'awaitingAssignment' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "EVALUATOR_ASSIGNMENT_PENDING"',
                 [$collegeId]
             ),
             'underEvaluation' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "UNDER_COLLEGE_EVALUATION"',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("UNDER_COLLEGE_EVALUATION","UNDER_EVALUATION","EVALUATOR_ASSIGNED","EVALUATOR_ACCEPTED")',
                 [$collegeId]
             ),
             'awaitingDecision' => $scalar(
@@ -37,11 +45,23 @@ final class CollegeCoordinatorController
                 [$collegeId]
             ),
             'forwardedToUniversity' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","AWAITING_UNIVERSITY_DECISION","APPROVED","FUNDED")',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","AWAITING_COMMITTEE_DECISION","APPROVED","FUNDED")',
+                [$collegeId]
+            ),
+            'collegeApproved' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("AWAITING_UNIVERSITY_SUBMISSION","SUBMITTED_TO_RPEE","AWAITING_UNIVERSITY_EVALUATION","UNDER_UNIVERSITY_EVALUATION","UNIVERSITY_REVIEW","APPROVED","FUNDED")',
                 [$collegeId]
             ),
             'collegeRejected' => $scalar(
-                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code = "REJECTED_BY_COLLEGE"',
+                'SELECT COUNT(*) FROM research_applications WHERE college_id = ? AND status_code IN ("REJECTED_BY_COLLEGE","COLLEGE_REJECTED")',
+                [$collegeId]
+            ),
+            'pendingAssessments' => $scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments ea JOIN research_applications a ON a.id = ea.application_id WHERE a.college_id = ? AND ea.status IN ("assigned","accepted") AND ea.is_active = 1',
+                [$collegeId]
+            ),
+            'overdueAssessments' => $scalar(
+                'SELECT COUNT(*) FROM evaluator_assignments ea JOIN research_applications a ON a.id = ea.application_id WHERE a.college_id = ? AND ea.status IN ("assigned","accepted") AND ea.deadline IS NOT NULL AND ea.deadline < date("now")',
                 [$collegeId]
             ),
             'activeProjects' => $scalar(
@@ -156,16 +176,14 @@ final class CollegeCoordinatorController
                 'SELECT a.id, a.application_number, a.title, a.status_code, a.submitted_at, u.full_name as pi_name
                  FROM research_applications a
                  JOIN users u ON u.id = a.pi_user_id
-                 WHERE a.college_id = ? AND a.status_code IN ("SUBMITTED_TO_RPEE","COLLEGE_RECEIVED","UNDER_COLLEGE_SCREENING")
+                 WHERE a.college_id = ? AND a.status_code IN ("SUBMITTED","COLLEGE_RECEIVED","UNDER_COLLEGE_SCREENING","SUBMITTED_TO_RPEE")
                  ORDER BY a.submitted_at ASC LIMIT 10',
                 [$collegeId]
             ),
             'needsEvaluators' => Database::all(
                 'SELECT a.id, a.application_number, a.title, a.status_code,
-                       rc.required_evaluators,
-                       (SELECT COUNT(*) FROM evaluator_assignments ea WHERE ea.application_id = a.id AND ea.status IN ("assigned","accepted")) as assigned_count
+                       (SELECT COUNT(*) FROM evaluator_assignments ea WHERE ea.application_id = a.id AND ea.status IN ("assigned","accepted") AND ea.is_active = 1) as assigned_count
                  FROM research_applications a
-                 LEFT JOIN research_calls rc ON rc.id = a.call_id
                  WHERE a.college_id = ? AND a.status_code = "EVALUATOR_ASSIGNMENT_PENDING"
                  ORDER BY a.submitted_at ASC LIMIT 10',
                 [$collegeId]
@@ -190,24 +208,17 @@ final class CollegeCoordinatorController
                  ORDER BY ea.deadline ASC LIMIT 10',
                 [$collegeId]
             ),
-            'awaitingReview' => Database::all(
-                'SELECT a.id, a.application_number, a.title, a.status_code,
+            'readyForDecision' => Database::all(
+                'SELECT a.id, a.application_number, a.title, a.status_code, u.full_name as pi_name,
                        (SELECT COUNT(*) FROM evaluations e WHERE e.application_id = a.id AND e.status = "submitted") as completed_count,
-                       (SELECT rc.required_evaluators FROM research_calls rc WHERE rc.id = a.call_id) as required_count
+                       (SELECT COUNT(*) FROM evaluator_assignments ea WHERE ea.application_id = a.id AND ea.status IN ("assigned","accepted") AND ea.is_active = 1) as pending_count,
+                       (SELECT ROUND(AVG(e.weighted_score), 2) FROM evaluations e WHERE e.application_id = a.id AND e.status = "submitted") as avg_score
                  FROM research_applications a
-                 WHERE a.college_id = ? AND a.status_code = "AWAITING_COLLEGE_DECISION"
-                 ORDER BY a.evaluation_completed_at DESC LIMIT 10',
-                [$collegeId]
-            ),
-            'readyToForward' => Database::all(
-                'SELECT a.id, a.application_number, a.title, a.status_code,
-                       (SELECT COUNT(*) FROM evaluations e WHERE e.application_id = a.id AND e.status = "submitted") as completed_count,
-                       (SELECT rc.required_evaluators FROM research_calls rc WHERE rc.id = a.call_id) as required_count
-                 FROM research_applications a
-                 LEFT JOIN research_calls rc ON rc.id = a.call_id
-                 WHERE a.college_id = ? AND a.status_code = "UNDER_COLLEGE_EVALUATION"
-                 AND (SELECT COUNT(*) FROM evaluations e WHERE e.application_id = a.id AND e.status = "submitted") >= COALESCE(rc.required_evaluators, 2)
-                 ORDER BY a.evaluation_completed_at DESC LIMIT 10',
+                 JOIN users u ON u.id = a.pi_user_id
+                 WHERE a.college_id = ?
+                 AND a.status_code IN ("UNDER_COLLEGE_EVALUATION","UNDER_EVALUATION","AWAITING_COLLEGE_DECISION")
+                 AND (SELECT COUNT(*) FROM evaluations e WHERE e.application_id = a.id AND e.status = "submitted") >= 2
+                 ORDER BY a.submitted_at ASC LIMIT 15',
                 [$collegeId]
             ),
         ];

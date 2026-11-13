@@ -22,6 +22,11 @@ final class MonthlyReportService
         return $now->format('Y-m');
     }
 
+    public static function generateDueReports(?string $period = null): array
+    {
+        return self::dueProjects($period);
+    }
+
     /**
      * Return active projects that have no submitted/approved report for the period.
      */

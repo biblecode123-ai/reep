@@ -144,7 +144,8 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       // Transitions driven by their own structured forms below (extra data is
       // required) — never fire them from the generic button.
       $formDriven = ['Request revision', 'Request revision (directorate)', 'Submit revision',
-                     'Budget approved', 'Assign to research committee', 'Activate project'];
+                     'Budget approved', 'Assign to research committee', 'Activate project',
+                     'Forward to university', 'College reject'];
     ?>
     <div class="card">
       <h2 class="mt0">Available actions</h2>
@@ -168,37 +169,37 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
     <div class="card">
       <h2 class="mt0">Evaluations</h2>
       <?php
-        $requiredEvaluators = (int) ($app['required_evaluators'] ?? 2);
+        $canSeeScores = Gate::allows('research.screen', 'research.review', 'research.manage') || !empty($isAssignedEvaluator);
         $assignedCount = count($assignments);
-        $completedCount = 0;
-        foreach ($assignments as $as) {
-            if ($as['status'] === 'completed') {
-                $completedCount++;
+        $submittedCount = 0;
+        foreach ($evaluations as $evRow) {
+            if (($evRow['status'] ?? '') === 'submitted' && ($evRow['evaluation_type'] ?? 'proposal') !== 'university') {
+                $submittedCount++;
             }
         }
-        $progressPercent = $requiredEvaluators > 0 ? min(100, round(($completedCount / $requiredEvaluators) * 100)) : 0;
+        $pendingCount = 0;
+        foreach ($assignments as $as) {
+            if (in_array($as['status'], ['assigned', 'accepted'], true)) {
+                $pendingCount++;
+            }
+        }
+        $progressPercent = min(100, (int) round(($submittedCount / 2) * 100));
       ?>
-      <div style="margin-bottom:16px;padding:12px;background:var(--bg-tint,#f6f8fa);border-radius:var(--r-md);">
+      <div style="margin-bottom:16px;padding:12px;background:var(--brand-soft);border-radius:var(--radius-md);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-weight:600;">Evaluation Progress</span>
-          <span><?= $completedCount ?> / <?= $requiredEvaluators ?> completed</span>
+          <span style="font-weight:600;">College evaluation progress</span>
+          <span><?= $submittedCount ?> submitted · <?= $pendingCount ?> pending · <?= $assignedCount ?> assigned</span>
         </div>
-        <div style="height:8px;background:var(--line);border-radius:var(--r-pill);overflow:hidden;">
-          <div style="height:100%;background:var(--brand);width:<?= $progressPercent ?>%;transition:width var(--t-med);"></div>
+        <div style="height:8px;background:var(--border-light);border-radius:var(--radius-pill);overflow:hidden;">
+          <div style="height:100%;background:var(--brand);width:<?= $progressPercent ?>%;"></div>
         </div>
-        <?php if ($assignedCount < $requiredEvaluators): ?>
-          <div style="margin-top:8px;font-size:13px;color:var(--muted);">
-            <?= $requiredEvaluators - $assignedCount ?> evaluator(s) still need to be assigned.
-          </div>
-        <?php elseif ($completedCount < $requiredEvaluators): ?>
-          <div style="margin-top:8px;font-size:13px;color:var(--muted);">
-            <?= $requiredEvaluators - $completedCount ?> evaluation(s) pending.
-          </div>
-        <?php else: ?>
-          <div style="margin-top:8px;font-size:13px;color:var(--ok);">
-            ✓ All required evaluations completed.
-          </div>
-        <?php endif; ?>
+        <div style="margin-top:8px;font-size:13px;color:var(--text-muted);">
+          <?php if ($submittedCount < 2): ?>
+            The college average is calculated after at least two submitted assessments. Pending evaluators are excluded from the average and do not block it once two assessments are in.
+          <?php else: ?>
+            Minimum of two submitted assessments is met. Pending evaluators are not included in the average.
+          <?php endif; ?>
+        </div>
       </div>
 
       <?php if (!$assignments): ?><p class="muted">No evaluators assigned yet.</p><?php else: ?>
@@ -306,7 +307,7 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       }
       </script>
 
-      <?php if ($evaluations): ?>
+      <?php if ($evaluations && $canSeeScores): ?>
         <?php foreach ($evaluations as $ev): ?>
           <h3>Evaluation #<?= (int) $ev['id'] ?> (round <?= (int) $ev['evaluation_round'] ?>)
             <?php if ($canSeeEvaluatorNames): ?><span class="muted" style="font-weight:400;font-size:13px;">— <?= e($ev['evaluator_name']) ?></span><?php endif; ?></h3>
@@ -417,76 +418,52 @@ $isPi = (int) $app['pi_user_id'] === Auth::id();
       <?php endif; ?>
     </div>
 
-    <!-- College-level decision (forwarding to university) -->
-    <?php if (Gate::allows('research.screen') && in_array($app['status_code'], ['AWAITING_COLLEGE_DECISION', 'COLLEGE_REVIEW'], true)): ?>
+    <!-- College-level decision: calculated, not a manual override -->
+    <?php if (Gate::allows('research.screen') && in_array($app['status_code'], ['AWAITING_COLLEGE_DECISION', 'COLLEGE_REVIEW', 'EVALUATION_COMPLETED'], true)): ?>
     <div class="card" id="college-decision">
-      <h2 class="mt0">College Decision</h2>
-      <p class="muted" style="margin-bottom:12px;">Record the college-level outcome and forward eligible proposals to university evaluation.</p>
-
-      <!-- Evaluation Summary -->
-      <?php if ($evaluations): ?>
-      <div style="background:var(--bg-soft);padding:12px;border-radius:4px;margin-bottom:16px;">
-        <h3 style="margin-top:0;">Consolidated Evaluation Summary</h3>
-        <?php
-        $submittedEvals = array_filter($evaluations, fn($e) => $e['status'] === 'submitted');
-        $totalScore = 0;
+      <h2 class="mt0">College result</h2>
+      <p class="muted" style="margin-bottom:12px;">The result is calculated from submitted assessments only. A coordinator cannot choose a different pass or rejection outcome.</p>
+      <?php
+        $submittedEvals = array_filter($evaluations, fn($e) => ($e['status'] ?? '') === 'submitted' && ($e['evaluation_type'] ?? 'proposal') !== 'university');
+        $totalScore = 0.0;
         $scoreCount = 0;
-        $recommendations = [];
         foreach ($submittedEvals as $ev) {
           if ($ev['weighted_score'] !== null) {
             $totalScore += (float) $ev['weighted_score'];
             $scoreCount++;
           }
-          if ($ev['recommendation']) {
-            $recommendations[] = $ev['recommendation'];
-          }
         }
         $avgScore = $scoreCount > 0 ? $totalScore / $scoreCount : 0;
-        ?>
-        <dl class="kv">
-          <dt>Evaluations submitted</dt><dd><?= count($submittedEvals) ?> / <?= (int) ($app['required_evaluators'] ?? 2) ?> required</dd>
-          <dt>Average weighted score</dt><dd><strong><?= number_format($avgScore, 1) ?></strong> / 100</dd>
-          <dt>Recommendations</dt><dd>
-            <?php if ($recommendations): ?>
-              <?php
-              $recCounts = array_count_values($recommendations);
-              foreach ($recCounts as $rec => $count): ?>
-                <?= e(ucfirst(str_replace('_', ' ', $rec))) ?>: <?= $count ?><?= $count < count($recommendations) ? ', ' : '' ?>
-              <?php endforeach; ?>
-            <?php else: ?>
-              No recommendations recorded
-            <?php endif; ?>
-          </dd>
-        </dl>
-        <?php if ($scoreCount < (int) ($app['required_evaluators'] ?? 2)): ?>
-        <div class="alert alert-warning" style="margin-top:8px;">
-          Not all required evaluations are complete. You may still decide, but consider awaiting all evaluations.
-        </div>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
-
-      <form method="post" action="<?= e(url('action=college_decision')) ?>">
+        $isPass = $scoreCount >= 2 && $avgScore >= 50.0;
+      ?>
+      <dl class="kv">
+        <dt>Submitted assessments</dt><dd><?= $scoreCount ?></dd>
+        <dt>Pending assignments</dt><dd><?= (int) ($pendingCount ?? 0) ?></dd>
+        <dt>Minimum required</dt><dd>2 submitted</dd>
+        <dt>Average of submitted marks</dt><dd><strong><?= $scoreCount > 0 ? number_format($avgScore, 2) : '—' ?></strong><?= $scoreCount > 0 ? '%' : '' ?></dd>
+        <dt>Threshold</dt><dd>50%</dd>
+        <dt>Calculated result</dt>
+        <dd>
+          <?php if ($scoreCount < 2): ?>
+            <span class="badge badge-warning">Waiting for <?= 2 - $scoreCount ?> more submitted assessment<?= (2 - $scoreCount) === 1 ? '' : 's' ?></span>
+          <?php elseif ($isPass): ?>
+            <span class="badge badge-ok">PASS — forward to university</span>
+          <?php else: ?>
+            <span class="badge badge-danger">REJECTED — stays at college</span>
+          <?php endif; ?>
+        </dd>
+      </dl>
+      <?php if ($scoreCount >= 2): ?>
+      <form method="post" action="<?= e(url('action=college_decision')) ?>" data-confirm="Record the calculated college result? This cannot be overridden.">
         <?= \App\Core\Csrf::field() ?>
         <input type="hidden" name="id" value="<?= (int) $app['id'] ?>">
-        <label>Decision <span class="req">*</span></label>
-        <select name="decision" required>
-          <option value="">Select decision...</option>
-          <option value="forward_to_university" <?= $scoreCount >= (int) ($app['required_evaluators'] ?? 2) ? '' : 'disabled' ?>>
-            Forward to university evaluation
-            <?php if ($scoreCount < (int) ($app['required_evaluators'] ?? 2)): ?>
-              (requires all evaluations)
-            <?php endif; ?>
-          </option>
-          <option value="return_for_revision">Return for revision</option>
-          <option value="reject_at_college">Reject at college level</option>
-        </select>
-        <label>Comments / Reason</label>
-        <textarea name="comment" style="min-height:60px;" placeholder="Provide justification for this decision..."></textarea>
+        <label>Note for the record</label>
+        <textarea name="comment" style="min-height:60px;" placeholder="Optional note. The pass or rejection result is calculated by the system."></textarea>
         <div class="form-actions">
-          <button class="btn" type="submit">Record decision</button>
+          <button class="btn" type="submit"><?= $isPass ? 'Record PASS and forward' : 'Record REJECTED' ?></button>
         </div>
       </form>
+      <?php endif; ?>
     </div>
     <?php endif; ?>
 

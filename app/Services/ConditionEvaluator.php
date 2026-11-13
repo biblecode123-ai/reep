@@ -16,6 +16,7 @@ final class ConditionEvaluator
         return match ($key) {
             'documents_complete'      => self::documentsComplete($entityType, $entityId),
             'evaluations_passed'      => self::evaluationsPassed($entityType, $entityId),
+            'evaluations_complete'    => self::evaluationsComplete($entityType, $entityId),
             'univ_evaluations_complete'=> self::univEvaluationsComplete($entityType, $entityId),
             'ethics_required'         => self::ethicsRequired($entity),
             'ethics_cleared'          => self::ethicsCleared($entityType, $entityId, $entity),
@@ -31,7 +32,7 @@ final class ConditionEvaluator
             'committee_wants_revision'=> self::committeeDecision($entityId, ['revision_required'], 'The university research committee has not requested a revision.'),
             'agreement_signed'        => self::agreementSigned($entityType, $entityId),
             'budget_recorded'         => self::budgetRecorded($entityType, $entityId),
-            default                   => [true, null], // unknown condition: do not block
+            default                   => [false, 'Unsupported workflow condition: ' . $key],
         };
     }
 
@@ -61,6 +62,13 @@ final class ConditionEvaluator
         if ($entityType !== 'research_application') {
             return [true, null];
         }
+        $submitted = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
+            [$id]
+        );
+        if ($submitted < 2) {
+            return [false, 'At least two submitted college assessments are required before a pass can be recorded (' . $submitted . ' submitted).'];
+        }
         $avgScore = (float) Database::scalar(
             'SELECT AVG(weighted_score) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
             [$id]
@@ -70,33 +78,30 @@ final class ConditionEvaluator
             : [false, 'College evaluation average score is below the 50% pass threshold (current average: ' . round($avgScore, 2) . '%).'];
     }
 
+    /**
+     * University quorum, voting and score aggregation are not an approved policy.
+     * Do not invent a minimum member count here. The from-stage and permission
+     * on the transition still apply.
+     */
     private static function univEvaluationsComplete(string $entityType, int $id): array
     {
         if ($entityType !== 'research_application') {
             return [true, null];
         }
-        // Assuming institution policy sets required evaluators for university review
-        $required = 3; 
-        $done = (int) Database::scalar(
-            'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "university"',
-            [$id]
-        );
-        return $done >= $required
-            ? [true, null]
-            : [false, 'Required university-level evaluations not complete (' . $done . '/' . $required . ').'];
+        return [true, null];
     }
 
+    /**
+     * College rule: at least two submitted assessments. Pending assignments
+     * do not raise the minimum. Call-level required_evaluators is not used.
+     */
     private static function evaluationsComplete(string $entityType, int $id): array
     {
         if ($entityType !== 'research_application') {
             return [true, null];
         }
-        $app = Database::one('SELECT call_id, status_code, revision_submitted_at FROM research_applications WHERE id = ?', [$id]);
-        $required = (int) (Database::scalar(
-            'SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]
-        ) ?? 2);
-        // After a revision only evaluations submitted for the NEW version count,
-        // so a stale round-1 evaluation can never satisfy re-evaluation (§25).
+        $minimum = 2;
+        $app = Database::one('SELECT status_code, revision_submitted_at FROM research_applications WHERE id = ?', [$id]);
         if ($app['revision_submitted_at'] !== null
             && in_array($app['status_code'], ['REVISION_SUBMITTED', 'RE_EVALUATION'], true)) {
             $done = (int) Database::scalar(
@@ -104,17 +109,17 @@ final class ConditionEvaluator
                  WHERE application_id = ? AND status = "submitted" AND submitted_at > ? AND evaluation_type = "proposal"',
                 [$id, $app['revision_submitted_at']]
             );
-            return $done >= $required
+            return $done >= $minimum
                 ? [true, null]
-                : [false, 'Re-evaluations of the revised version are not complete (' . $done . '/' . $required . ').'];
+                : [false, 'At least two submitted re-evaluations of the revised version are required (' . $done . '/' . $minimum . ').'];
         }
         $done = (int) Database::scalar(
             'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
             [$id]
         );
-        return $done >= $required
+        return $done >= $minimum
             ? [true, null]
-            : [false, 'Required evaluations not complete (' . $done . '/' . $required . ').'];
+            : [false, 'At least two submitted college evaluations are required (' . $done . '/' . $minimum . ').'];
     }
 
     private static function ethicsRequired(array $entity): array

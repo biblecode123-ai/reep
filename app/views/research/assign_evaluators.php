@@ -6,7 +6,7 @@ include APP_PATH . '/views/partials/header.php';
 <div class="page-head">
   <div><h1>Assign evaluators</h1>
   <p><?= e($app['application_number']) ?> — <?= e($app['title']) ?> ·
-     Required evaluators: <strong><?= (int) ($app['required_evaluators'] ?? 2) ?></strong></p></div>
+     Assign any number of eligible researchers from this college. The college average is calculated after at least two submitted assessments.</p></div>
 </div>
 
 <?php if ($assignments): ?>

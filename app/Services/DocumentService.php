@@ -177,9 +177,6 @@ final class DocumentService
         if (!Auth::check()) {
             return false;
         }
-        if (Gate::isAdmin()) {
-            return true;
-        }
         if (Gate::denies('document.view')) {
             return false;
         }

@@ -71,6 +71,9 @@ final class CallModel
         if (!isset($data['call_number'])) {
             $data['call_number'] = \App\Services\NumberingService::next('research_call');
         }
+        if (!isset($data['required_evaluators'])) {
+            $data['required_evaluators'] = 1;
+        }
         return Database::insert('research_calls', $data);
     }
 
@@ -153,5 +156,28 @@ final class CallModel
     public static function criteriaFor(int $callId): array
     {
         return self::criteria($callId);
+    }
+
+    public static function themesForCall(int $callId): array
+    {
+        return Database::all(
+            'SELECT t.* FROM research_themes t
+             JOIN research_call_themes rct ON rct.theme_id = t.id
+             WHERE rct.call_id = ? AND t.status = "active"
+             ORDER BY t.name ASC',
+            [$callId]
+        );
+    }
+
+    public static function setThemesForCall(int $callId, array $themeIds): void
+    {
+        Database::run('DELETE FROM research_call_themes WHERE call_id = ?', [$callId]);
+        $stmt = Database::pdo()->prepare('INSERT OR IGNORE INTO research_call_themes (call_id, theme_id) VALUES (?, ?)');
+        foreach ($themeIds as $tid) {
+            $tid = (int) $tid;
+            if ($tid > 0) {
+                $stmt->execute([$callId, $tid]);
+            }
+        }
     }
 }

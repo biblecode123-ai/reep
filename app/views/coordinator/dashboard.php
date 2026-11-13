@@ -1,505 +1,311 @@
 <?php
-$title = 'College Coordinator Dashboard';
+$title = 'College Research Coordinator Dashboard';
 include APP_PATH . '/views/partials/header.php';
 ?>
 
-<div class="page-head">
-  <div><h1>College Coordinator Dashboard</h1></div>
+<!-- Enhanced Page Header -->
+<div class="page-head mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge badge-purple font-weight-bold px-2 py-1"><i class="fas fa-university mr-1"></i> College Operations</span>
+            <span class="text-muted small">Madda Walabu University</span>
+        </div>
+        <h1 class="page-title h3 font-weight-bold m-0 text-dark">College Research Coordination Dashboard</h1>
+        <p class="text-muted small m-0 mt-1">Operational proposal screening, multi-evaluator assignment, and automated college evaluation scoring.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        <a class="btn btn-primary shadow-sm" href="<?= e(url('action=coordinator_proposals')) ?>">
+            <i class="fas fa-folder-open mr-1"></i> View All College Proposals
+        </a>
+        <a class="btn btn-outline shadow-sm" href="<?= e(url('action=coordinator_proposals&filter=needs_evaluators')) ?>">
+            <i class="fas fa-user-edit mr-1"></i> Evaluator Assignments
+        </a>
+        <a class="btn btn-outline shadow-sm" href="<?= e(url('action=reports')) ?>">
+            <i class="fas fa-chart-line mr-1"></i> College Reports
+        </a>
+    </div>
 </div>
 
-<!-- Summary Cards -->
-<section>
-  <h2 class="section-title">Summary</h2>
-  <div class="grid grid-4">
-    <div class="stat">
-      <div class="num"><?= $stats['newSubmissions'] ?></div>
-      <div class="lbl">New Submissions</div>
+<!-- Primary Stats Grid -->
+<div class="row g-3 mb-4">
+    <!-- College Submissions Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg p-3 position-relative overflow-hidden" style="border-left: 4px solid #594FB6 !important; background: #ffffff;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="text-uppercase text-muted font-weight-bold" style="font-size: 11px; letter-spacing: 0.5px;">College Submissions</span>
+                    <div class="h2 font-weight-bold m-0 text-dark mt-1"><?= (int) ($stats['totalProposals'] ?? 0) ?></div>
+                </div>
+                <div class="p-2 rounded-circle" style="background: rgba(89, 79, 182, 0.1); color: #594FB6;">
+                    <i class="fas fa-file-alt fa-lg"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top">
+                <span class="badge badge-amber font-weight-bold"><i class="fas fa-inbox mr-1"></i> <?= (int) ($stats['newSubmissions'] ?? 0) ?> New Submissions</span>
+            </div>
+        </div>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['underEvaluation'] ?></div>
-      <div class="lbl">Under Evaluation</div>
+
+    <!-- Evaluation Pipeline Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg p-3 position-relative overflow-hidden" style="border-left: 4px solid #3B82F6 !important; background: #ffffff;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="text-uppercase text-muted font-weight-bold" style="font-size: 11px; letter-spacing: 0.5px;">Evaluation Pipeline</span>
+                    <div class="h2 font-weight-bold m-0 text-dark mt-1"><?= (int) ($stats['underEvaluation'] ?? 0) ?></div>
+                </div>
+                <div class="p-2 rounded-circle" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6;">
+                    <i class="fas fa-clock fa-lg"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top">
+                <span class="badge badge-purple font-weight-bold"><?= (int) ($stats['awaitingAssignment'] ?? 0) ?> Needs Evaluators</span>
+                <span class="badge badge-info font-weight-bold"><?= (int) ($stats['pendingAssessments'] ?? 0) ?> Pending</span>
+            </div>
+        </div>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['awaitingDecision'] ?></div>
-      <div class="lbl">Awaiting Decision</div>
+
+    <!-- Decision Ready Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg p-3 position-relative overflow-hidden" style="border-left: 4px solid #10B981 !important; background: #ffffff;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="text-uppercase text-muted font-weight-bold" style="font-size: 11px; letter-spacing: 0.5px;">Decision Ready</span>
+                    <div class="h2 font-weight-bold m-0 text-dark mt-1"><?= count($priorityActions['readyForDecision'] ?? []) ?></div>
+                </div>
+                <div class="p-2 rounded-circle" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">
+                    <i class="fas fa-balance-scale fa-lg"></i>
+                </div>
+            </div>
+            <div class="text-muted small mt-2 pt-2 border-top">
+                <span class="badge badge-green font-weight-bold"><i class="fas fa-check-double mr-1"></i> ≥ 2 Submissions Met</span>
+            </div>
+        </div>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['forwardedToUniversity'] ?></div>
-      <div class="lbl">Forwarded to University</div>
+
+    <!-- Forwarded to University Card -->
+    <div class="col-xl-3 col-md-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg p-3 position-relative overflow-hidden" style="border-left: 4px solid #8B5CF6 !important; background: #ffffff;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="text-uppercase text-muted font-weight-bold" style="font-size: 11px; letter-spacing: 0.5px;">Forwarded to University</span>
+                    <div class="h2 font-weight-bold m-0 text-dark mt-1"><?= (int) ($stats['forwardedToUniversity'] ?? 0) ?></div>
+                </div>
+                <div class="p-2 rounded-circle" style="background: rgba(139, 92, 246, 0.1); color: #8B5CF6;">
+                    <i class="fas fa-paper-plane fa-lg"></i>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2 pt-2 border-top">
+                <span class="badge badge-green font-weight-bold"><?= (int) ($stats['collegeApproved'] ?? 0) ?> Approved (≥ 50%)</span>
+                <span class="badge badge-danger font-weight-bold"><?= (int) ($stats['collegeRejected'] ?? 0) ?> Rejected</span>
+            </div>
+        </div>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['collegeRejected'] ?></div>
-      <div class="lbl">College Rejected</div>
+</div>
+
+<!-- Priority Action 1: Ready for Decision (Minimum 2 Submissions Rule) -->
+<?php if (!empty($priorityActions['readyForDecision'])): ?>
+<div class="card border-0 shadow-sm rounded-lg mb-4" style="border-left: 4px solid #10B981 !important;">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="h5 font-weight-bold text-dark m-0"><i class="fas fa-bolt text-warning mr-2"></i> Minimum Submission Quorum Met (Ready for Calculation)</h2>
+            <div class="text-muted small">These proposals have reached at least 2 submitted evaluations. The system automatically computes the average of submitted assessments and applies the 50% pass threshold.</div>
+        </div>
+        <span class="badge badge-green px-3 py-1 font-weight-bold"><?= count($priorityActions['readyForDecision']) ?> Ready</span>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['activeProjects'] ?></div>
-      <div class="lbl">Active Projects</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-2">Proposal</th>
+                    <th class="py-2">Principal Researcher</th>
+                    <th class="py-2 text-center">Submitted / Pending</th>
+                    <th class="py-2 text-center">Calculated Average</th>
+                    <th class="py-2 text-center">Result (50% Threshold)</th>
+                    <th class="py-2 text-right">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($priorityActions['readyForDecision'] as $app): ?>
+                <?php $isPass = ((float)$app['avg_score'] >= 50.0); ?>
+                <tr>
+                    <td class="py-2">
+                        <strong class="text-purple"><?= e($app['application_number']) ?></strong><br>
+                        <a href="<?= e(url('action=application_view&id=' . $app['id'])) ?>" class="font-weight-bold text-dark">
+                            <?= e($app['title']) ?>
+                        </a>
+                    </td>
+                    <td class="py-2 font-weight-bold"><?= e($app['pi_name']) ?></td>
+                    <td class="py-2 text-center">
+                        <span class="badge badge-green"><?= (int) $app['completed_count'] ?> submitted</span>
+                        <?php if ((int)$app['pending_count'] > 0): ?>
+                            <span class="badge badge-amber"><?= (int) $app['pending_count'] ?> pending</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="py-2 text-center">
+                        <strong class="h5 font-weight-bold m-0" style="color: <?= $isPass ? '#10B981' : '#EF4444' ?>;">
+                            <?= number_format((float) $app['avg_score'], 2) ?>%
+                        </strong>
+                    </td>
+                    <td class="py-2 text-center">
+                        <?php if ($isPass): ?>
+                            <span class="badge badge-green font-weight-bold">PASS (≥ 50%)</span>
+                        <?php else: ?>
+                            <span class="badge badge-danger font-weight-bold">REJECTED (&lt; 50%)</span>
+                        <?php endif; ?>
+                    </td>
+                    <td class="py-2 text-right">
+                        <a class="btn btn-primary btn-sm font-weight-bold" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">
+                            Review & Forward &rarr;
+                        </a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
-    <div class="stat">
-      <div class="num"><?= $stats['reportsSubmitted'] ?></div>
-      <div class="lbl">Reports Submitted</div>
-    </div>
-    <div class="stat">
-      <div class="num danger"><?= $stats['reportsOverdue'] ?></div>
-      <div class="lbl">Reports Overdue</div>
-    </div>
-  </div>
-</section>
-
-<!-- Priority Action List -->
-<section>
-  <h2 class="section-title">Priority Actions</h2>
-
-  <?php if ($priorityActions['screeningNeeded']): ?>
-  <div class="card" style="margin-bottom: 20px;">
-    <h3 style="color: var(--danger);">Needs Screening (<?= count($priorityActions['screeningNeeded']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>PI</th>
-          <th>Status</th>
-          <th>Submitted</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['screeningNeeded'] as $app): ?>
-        <tr>
-          <td><?= e($app['application_number']) ?></td>
-          <td><?= e($app['title']) ?></td>
-          <td><?= e($app['pi_name']) ?></td>
-          <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= e(format_date($app['submitted_at'])) ?></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Screen</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($priorityActions['needsEvaluators']): ?>
-  <div class="card" style="margin-bottom: 20px;">
-    <h3 style="color: var(--warning);">Needs Evaluator Assignment (<?= count($priorityActions['needsEvaluators']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Evaluators Assigned</th>
-          <th>Required</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['needsEvaluators'] as $app): ?>
-        <tr>
-          <td><?= e($app['application_number']) ?></td>
-          <td><?= e($app['title']) ?></td>
-          <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= (int)$app['assigned_count'] ?></td>
-          <td><?= (int)($app['required_evaluators'] ?? 2) ?></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=assign_evaluators&id=' . $app['id'])) ?>">Assign</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($priorityActions['overdueEvaluations']): ?>
-  <div class="card" style="margin-bottom: 20px; border: 2px solid var(--danger);">
-    <h3 style="color: var(--danger);">Overdue Evaluations (<?= count($priorityActions['overdueEvaluations']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>Evaluator</th>
-          <th>Deadline</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['overdueEvaluations'] as $ea): ?>
-        <tr class="danger">
-          <td><?= e($ea['application_number']) ?></td>
-          <td><?= e($ea['title']) ?></td>
-          <td><?= e($ea['evaluator_name']) ?></td>
-          <td style="color: var(--danger);"><?= e(format_date($ea['deadline'])) ?></td>
-          <td><span class="badge"><?= e($ea['status']) ?></span></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $ea['id'])) ?>">Manage</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($priorityActions['approachingDeadlines']): ?>
-  <div class="card" style="margin-bottom: 20px;">
-    <h3 style="color: var(--warning);">Evaluations Approaching Deadline (<?= count($priorityActions['approachingDeadlines']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>Evaluator</th>
-          <th>Deadline</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['approachingDeadlines'] as $ea): ?>
-        <tr>
-          <td><?= e($ea['application_number']) ?></td>
-          <td><?= e($ea['title']) ?></td>
-          <td><?= e($ea['evaluator_name']) ?></td>
-          <td style="color: var(--warning);"><?= e(format_date($ea['deadline'])) ?></td>
-          <td><span class="badge"><?= e($ea['status']) ?></span></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $ea['id'])) ?>">Manage</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($priorityActions['awaitingReview']): ?>
-  <div class="card" style="margin-bottom: 20px;">
-    <h3>Awaiting College Decision (<?= count($priorityActions['awaitingReview']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Evaluations Complete</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['awaitingReview'] as $app): ?>
-        <tr>
-          <td><?= e($app['application_number']) ?></td>
-          <td><?= e($app['title']) ?></td>
-          <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= (int)$app['completed_count'] ?> / <?= (int)($app['required_count'] ?? 2) ?></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Decide</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if ($priorityActions['readyToForward']): ?>
-  <div class="card" style="margin-bottom: 20px;">
-    <h3 style="color: var(--brand);">Ready to Forward to University (<?= count($priorityActions['readyToForward']) ?>)</h3>
-    <table class="tbl">
-      <thead>
-        <tr>
-          <th>Application Number</th>
-          <th>Title</th>
-          <th>Status</th>
-          <th>Evaluations Complete</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php foreach ($priorityActions['readyToForward'] as $app): ?>
-        <tr>
-          <td><?= e($app['application_number']) ?></td>
-          <td><?= e($app['title']) ?></td>
-          <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-          <td><?= (int)$app['completed_count'] ?> / <?= (int)($app['required_count'] ?? 2) ?></td>
-          <td>
-            <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Forward</a>
-          </td>
-        </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-  </div>
-  <?php endif; ?>
-
-  <?php if (!$priorityActions['screeningNeeded'] && !$priorityActions['needsEvaluators'] && !$priorityActions['overdueEvaluations'] && !$priorityActions['approachingDeadlines'] && !$priorityActions['awaitingReview'] && !$priorityActions['readyToForward']): ?>
-  <div class="card">
-    <p class="muted">No priority actions at this time. All tasks are up to date.</p>
-  </div>
-  <?php endif; ?>
-</section>
-
-<!-- New Submissions -->
-<section>
-  <h2 class="section-title">New Submissions</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Status</th>
-        <th>Submitted</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($newSubmissions): ?>
-      <?php foreach ($newSubmissions as $app): ?>
-      <tr>
-        <td><?= e($app['application_number']) ?></td>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['pi_name']) ?></td>
-        <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-        <td><?= e(format_date($app['submitted_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Screen</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="6" class="text-center muted">No new submissions.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
-
-<!-- Under Evaluation -->
-<section>
-  <h2 class="section-title">Under Evaluation</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Pending Evaluators</th>
-        <th>Completed Evaluators</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($underEvaluation): ?>
-      <?php foreach ($underEvaluation as $app): ?>
-      <tr>
-        <td><?= e($app['application_number']) ?></td>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['pi_name']) ?></td>
-        <td><?= (int)$app['pending_evaluators'] ?></td>
-        <td><?= (int)$app['completed_evaluators'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">View</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="6" class="text-center muted">No proposals under evaluation.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
-
-<!-- Awaiting Decision -->
-<section>
-  <h2 class="section-title">Awaiting College Decision</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Average Score</th>
-        <th>Evaluation Count</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($awaitingDecision): ?>
-      <?php foreach ($awaitingDecision as $app): ?>
-      <tr>
-        <td><?= e($app['application_number']) ?></td>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['pi_name']) ?></td>
-        <td><?= number_format((float)$app['avg_score'], 1) ?></td>
-        <td><?= (int)$app['eval_count'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Decide</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="6" class="text-center muted">No proposals awaiting decision.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
-
-<!-- Active Projects -->
-<section>
-  <h2 class="section-title">Active Projects</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Started</th>
-        <th>Pending Reports</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($activeProjects): ?>
-      <?php foreach ($activeProjects as $proj): ?>
-      <tr>
-        <td><?= e($proj['project_number']) ?></td>
-        <td><?= e($proj['title']) ?></td>
-        <td><?= e($proj['pi_name']) ?></td>
-        <td><?= e(format_date($proj['actual_start'])) ?></td>
-        <td><?= (int)$proj['pending_reports'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $proj['id'])) ?>">View</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="6" class="text-center muted">No active projects.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
-
-<!-- Progress Reports Awaiting Review -->
-<section>
-  <h2 class="section-title">Progress Reports Awaiting Review</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Report Number</th>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Period End</th>
-        <th>Submitted</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($pendingReports): ?>
-      <?php foreach ($pendingReports as $report): ?>
-      <tr>
-        <td><?= e($report['report_number']) ?></td>
-        <td><?= e($report['project_number']) ?></td>
-        <td><?= e($report['title']) ?></td>
-        <td><?= e($report['pi_name']) ?></td>
-        <td><?= e(format_date($report['period_end'])) ?></td>
-        <td><?= e(format_date($report['submitted_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Review</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="7" class="text-center muted">No reports awaiting review.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
-
-<!-- Overdue Reports -->
-<?php if ($overdueReports): ?>
-<section>
-  <h2 class="section-title">Overdue Reports</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Report Number</th>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Due Date</th>
-        <th>Days Overdue</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($overdueReports as $report): ?>
-      <tr class="danger">
-        <td><?= e($report['report_number']) ?></td>
-        <td><?= e($report['project_number']) ?></td>
-        <td><?= e($report['title']) ?></td>
-        <td><?= e($report['pi_name']) ?></td>
-        <td><?= e(format_date($report['period_end'])) ?></td>
-        <td><?= (int)$report['days_overdue'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Follow Up</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
+</div>
 <?php endif; ?>
 
-<!-- College Evaluators -->
-<section>
-  <h2 class="section-title">College Evaluators</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Department</th>
-        <th>Active Assignments</th>
-        <th>Availability</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if ($collegeEvaluators): ?>
-      <?php foreach ($collegeEvaluators as $eval): ?>
-      <tr>
-        <td><?= e($eval['full_name']) ?></td>
-        <td><?= e($eval['department_name'] ?? '—') ?></td>
-        <td><?= (int)$eval['active_assignments'] ?></td>
-        <td><span class="badge <?= $eval['availability_status'] === 'available' ? 'badge-success' : 'badge-secondary' ?>"><?= e(ucfirst($eval['availability_status'])) ?></span></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=screening_assign&evaluator_id=' . $eval['id'])) ?>">Assign</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-      <?php else: ?>
-      <tr>
-        <td colspan="5" class="text-center muted">No evaluators registered for this college.</td>
-      </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</section>
+<!-- Priority Action 2: Screening Needed & Evaluator Assignment Grids -->
+<div class="row g-4 mb-4">
+    <!-- Needs Screening Column -->
+    <div class="col-lg-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h5 font-weight-bold text-dark m-0"><i class="fas fa-search text-purple mr-2"></i> Initial Screening Queue</h2>
+                    <p class="text-muted small m-0">New submissions awaiting eligibility verification</p>
+                </div>
+                <span class="badge badge-amber"><?= count($priorityActions['screeningNeeded'] ?? []) ?></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="py-2">Proposal</th>
+                            <th class="py-2">PI</th>
+                            <th class="py-2">Submitted</th>
+                            <th class="py-2 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($priorityActions['screeningNeeded'])): ?>
+                            <tr><td colspan="4" class="text-center py-4 text-muted">Screening queue is clear.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($priorityActions['screeningNeeded'] as $app): ?>
+                            <tr>
+                                <td class="py-2">
+                                    <strong class="text-purple"><?= e($app['application_number']) ?></strong><br>
+                                    <small class="text-muted"><?= e(mb_strimwidth($app['title'], 0, 45, '…')) ?></small>
+                                </td>
+                                <td class="py-2 font-weight-bold"><?= e($app['pi_name']) ?></td>
+                                <td class="py-2 small text-muted" style="white-space:nowrap;"><?= e(format_date($app['submitted_at'])) ?></td>
+                                <td class="py-2 text-right">
+                                    <a class="btn btn-outline btn-sm font-weight-bold" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Screen</a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Needs Evaluators Column -->
+    <div class="col-lg-6">
+        <div class="card h-100 border-0 shadow-sm rounded-lg">
+            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h5 font-weight-bold text-dark m-0"><i class="fas fa-user-check text-purple mr-2"></i> Evaluator Assignment Needed</h2>
+                    <p class="text-muted small m-0">Screened proposals requiring college faculty evaluators</p>
+                </div>
+                <span class="badge badge-purple"><?= count($priorityActions['needsEvaluators'] ?? []) ?></span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="py-2">Proposal</th>
+                            <th class="py-2">Assigned</th>
+                            <th class="py-2 text-right">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($priorityActions['needsEvaluators'])): ?>
+                            <tr><td colspan="3" class="text-center py-4 text-muted">No proposals currently pending evaluator assignment.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($priorityActions['needsEvaluators'] as $app): ?>
+                            <tr>
+                                <td class="py-2">
+                                    <strong class="text-purple"><?= e($app['application_number']) ?></strong><br>
+                                    <small class="text-muted"><?= e(mb_strimwidth($app['title'], 0, 45, '…')) ?></small>
+                                </td>
+                                <td class="py-2"><span class="badge badge-amber"><?= (int) $app['assigned_count'] ?> evaluators</span></td>
+                                <td class="py-2 text-right">
+                                    <a class="btn btn-primary btn-sm font-weight-bold" href="<?= e(url('action=assign_evaluators&id=' . $app['id'])) ?>">Assign Evaluators</a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- College Evaluator Workload & Availability Directory -->
+<div class="card border-0 shadow-sm rounded-lg">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <div>
+            <h2 class="h5 font-weight-bold text-dark m-0"><i class="fas fa-users-cog text-purple mr-2"></i> College Evaluators Workload Directory</h2>
+            <div class="text-muted small">Registered faculty evaluators within your college and their active review loads</div>
+        </div>
+        <span class="badge badge-purple px-2 py-1"><?= count($collegeEvaluators ?? []) ?> Registered</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th class="py-2">Faculty Evaluator</th>
+                    <th class="py-2">Department</th>
+                    <th class="py-2">Current Active Review Workload</th>
+                    <th class="py-2 text-center">Availability Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($collegeEvaluators)): ?>
+                    <tr><td colspan="4" class="text-center py-4 text-muted">No faculty registered as evaluators in this college.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($collegeEvaluators as $ev): ?>
+                    <tr>
+                        <td class="py-2 font-weight-bold text-dark"><?= e($ev['full_name']) ?></td>
+                        <td class="py-2 text-muted"><?= e($ev['department_name'] ?? 'General') ?></td>
+                        <td class="py-2">
+                            <?php $load = (int) ($ev['active_assignments'] ?? 0); ?>
+                            <?php if ($load >= 4): ?>
+                                <span class="badge badge-danger"><?= $load ?> active reviews (High)</span>
+                            <?php elseif ($load >= 2): ?>
+                                <span class="badge badge-amber"><?= $load ?> active reviews (Moderate)</span>
+                            <?php else: ?>
+                                <span class="badge badge-green"><?= $load ?> active reviews (Available)</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="py-2 text-center">
+                            <?php if (($ev['availability_status'] ?? 'available') === 'available'): ?>
+                                <span class="badge badge-green font-weight-bold">Available</span>
+                            <?php else: ?>
+                                <span class="badge badge-danger font-weight-bold">Unavailable</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>

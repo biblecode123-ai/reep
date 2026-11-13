@@ -507,7 +507,13 @@ final class ScreeningController
 
     /**
      * College-level decision and forwarding to university evaluation.
-     * Called when all required evaluations are complete and coordinator makes the final college decision.
+     * Enforces the finalized institutional rule:
+     *  - Any number of evaluators may be assigned
+     *  - Minimum 2 submitted evaluations required
+     *  - Average is calculated from submitted evaluations only (pending does not block)
+     *  - >= 50% PASS -> Forward to University
+     *  - < 50% REJECTED
+     *  - Coordinator cannot manually override the calculated pass/rejection result
      */
     public static function collegeDecision(): void
     {
@@ -521,67 +527,77 @@ final class ScreeningController
         }
         self::assertCollegeScope($app, 'index.php?action=application_view&id=' . $id);
         
-        $decision = (string) ($_POST['decision'] ?? '');
         $comment = trim((string) ($_POST['comment'] ?? '')) ?: null;
         
-        // Validate decision
-        $validDecisions = ['forward_to_university', 'reject_at_college', 'return_for_revision'];
-        if (!in_array($decision, $validDecisions, true)) {
-            Session::flash('error', 'Invalid decision.');
+        // Retrieve submitted evaluations
+        $submittedEvals = Database::all(
+            'SELECT weighted_score FROM evaluations WHERE application_id = ? AND status = "submitted"',
+            [$id]
+        );
+        $submittedCount = count($submittedEvals);
+        $pendingCount = (int) Database::scalar(
+            'SELECT COUNT(*) FROM evaluator_assignments WHERE application_id = ? AND status IN ("assigned","accepted") AND is_active = 1',
+            [$id]
+        );
+
+        // Minimum submission rule: at least TWO submitted evaluations
+        if ($submittedCount < 2) {
+            Session::flash('error', "At least TWO evaluators must submit their assessments before the college decision can be calculated (currently: $submittedCount submitted, $pendingCount pending).");
             redirect('index.php?action=application_view&id=' . $id);
         }
-        
-        // Check that required evaluations are complete before forwarding
-        if ($decision === 'forward_to_university') {
-            $required = (int) (Database::scalar('SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]) ?? 2);
-            $completed = (int) Database::scalar('SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted"', [$id]);
-            if ($completed < $required) {
-                Session::flash('error', "Cannot forward: only $completed of $required required evaluations are complete.");
-                redirect('index.php?action=application_view&id=' . $id);
-            }
-        }
-        
+
+        // Calculate average mark from submitted evaluations only
+        $sum = array_sum(array_column($submittedEvals, 'weighted_score'));
+        $avgScore = round($sum / $submittedCount, 2);
+
+        // Mandatory 50% threshold: >= 50% PASS, < 50% REJECTED
+        $isPass = ($avgScore >= 50.0);
+        $systemDecision = $isPass ? 'forward_to_university' : 'reject_at_college';
+        $summaryNote = "Calculated Average: {$avgScore}% ({$submittedCount} submitted, {$pendingCount} pending; Threshold: 50.0%)";
+        $fullComment = $comment ? ($comment . "\n" . $summaryNote) : $summaryNote;
+
         // Record the college decision
         Database::insert('college_decisions', [
             'application_id'   => $id,
             'decision_context' => 'committee',
-            'decision'         => $decision === 'forward_to_university' ? 'forward_to_university' : 
-                                 ($decision === 'reject_at_college' ? 'reject' : 'revision_required'),
-            'comments'         => $comment,
+            'decision'         => $isPass ? 'forward_to_university' : 'reject',
+            'comments'         => $fullComment,
             'decided_by'       => Auth::id(),
         ]);
         
-        // Fire the appropriate workflow transition
-        $transition = match ($decision) {
-            'forward_to_university' => 'Forward to university',
-            'reject_at_college'     => 'College reject',
-            'return_for_revision'   => 'Request revision',
-        };
-        
+        // Fire workflow transition
+        $transition = $isPass ? 'Forward to university' : 'College reject';
         $app = ApplicationModel::find($id);
-        [$ok, $err] = WorkflowService::fire($app, 'research_application', $transition, $comment);
+        [$ok, $err] = WorkflowService::fire($app, 'research_application', $transition, $fullComment);
         
+        if (!$ok) {
+            // If the application is in UNDER_COLLEGE_EVALUATION or EVALUATOR_ACCEPTED, try completing evaluation first
+            if (in_array($app['status_code'], ['UNDER_COLLEGE_EVALUATION', 'UNDER_EVALUATION'], true)) {
+                WorkflowService::fire($app, 'research_application', 'Submit evaluation', $summaryNote);
+                $app = ApplicationModel::find($id);
+                [$ok, $err] = WorkflowService::fire($app, 'research_application', $transition, $fullComment);
+            }
+        }
+
         if (!$ok) {
             Session::flash('error', $err);
             redirect('index.php?action=application_view&id=' . $id);
         }
         
-        // Notify based on decision
-        if ($decision === 'forward_to_university') {
-            NotificationService::send((int) $app['pi_user_id'], 'proposal_forwarded', 'Proposal forwarded to university',
-                'Your proposal has been forwarded to university-level evaluation.', 'index.php?action=application_view&id=' . $id, 'high');
-            NotificationService::sendToRoles(['research_director', 'rpee_officer'], 'university_evaluation_pending',
-                'College proposal forwarded', 'A proposal requires university-level evaluation.', 'index.php?action=application_view&id=' . $id, 'high');
-        } elseif ($decision === 'reject_at_college') {
+        // Notifications
+        if ($isPass) {
+            NotificationService::send((int) $app['pi_user_id'], 'proposal_forwarded', 'Proposal passed college review',
+                "Your proposal achieved an average mark of {$avgScore}% and has been forwarded to university evaluation.", 'index.php?action=application_view&id=' . $id, 'high');
+            NotificationService::sendToRoles(['rpee_director', 'rpee_officer'], 'university_evaluation_pending',
+                'College proposal forwarded', "Proposal {$app['application_number']} passed college review ({$avgScore}%) and awaits university review.", 'index.php?action=application_view&id=' . $id, 'high');
+            Session::flash('success', "College evaluation complete: Average mark is {$avgScore}%. Result: PASS (>= 50%). Proposal forwarded to University Evaluation.");
+        } else {
             NotificationService::send((int) $app['pi_user_id'], 'proposal_rejected', 'Proposal rejected at college level',
-                $comment ?: 'Your proposal was rejected after college review.', 'index.php?action=application_view&id=' . $id, 'high');
-        } elseif ($decision === 'return_for_revision') {
-            NotificationService::send((int) $app['pi_user_id'], 'revision_requested', 'Revision requested',
-                $comment ?: 'Your proposal requires revision before proceeding.', 'index.php?action=application_view&id=' . $id, 'high');
+                "Your proposal achieved an average mark of {$avgScore}% which is below the 50% passing threshold.", 'index.php?action=application_view&id=' . $id, 'high');
+            Session::flash('warning', "College evaluation complete: Average mark is {$avgScore}%. Result: REJECTED (< 50%). Proposal will not proceed to university evaluation.");
         }
         
-        Audit::log('college.decision', 'research_application', $id, null, ['decision' => $decision]);
-        Session::flash('success', 'College decision recorded.');
+        Audit::log('college.decision', 'research_application', $id, null, ['decision' => $systemDecision, 'average_score' => $avgScore, 'submitted' => $submittedCount]);
         redirect('index.php?action=application_view&id=' . $id);
     }
 

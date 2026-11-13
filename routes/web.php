@@ -30,6 +30,7 @@ return [
 
     // Research calls
     'calls'               => [\App\Controllers\CallController::class, 'index', 'research.view'],
+    'api_call_themes'     => [\App\Controllers\CallController::class, 'apiThemes', null],
     'calls_public'        => [\App\Controllers\CallController::class, 'indexPublic', null],
     'call_form'           => [\App\Controllers\CallController::class, 'form', 'research.manage'],
     'call_save'           => [\App\Controllers\CallController::class, 'save', 'research.manage'],
@@ -121,7 +122,7 @@ return [
     'project_activate'    => [\App\Controllers\ProjectController::class, 'activate', 'project.activate'],
     'project_milestone_add' => [\App\Controllers\ProjectController::class, 'addMilestone', 'project.activate'],
     'project_milestone_update' => [\App\Controllers\ProjectController::class, 'updateMilestone', 'project.report'],
-    'project_report_submit' => [\App\Controllers\ProjectController::class, 'submitReport', 'project.report'],
+    'project_report_submit' => [\App\Controllers\MonthlyReportController::class, 'submit', 'project.report'],
     'project_report_review' => [\App\Controllers\ProjectController::class, 'reviewReport', 'research.screen'],
     'project_release_funds' => [\App\Controllers\ProjectController::class, 'releaseFunds', 'budget.release'],
     'project_extension_request' => [\App\Controllers\ProjectController::class, 'requestExtension', 'project.report'],

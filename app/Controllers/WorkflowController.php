@@ -70,6 +70,10 @@ final class WorkflowController
         $entityId   = (int) ($_POST['entity_id'] ?? 0);
         $transition = (string) ($_POST['transition'] ?? '');
         $comment    = trim((string) ($_POST['comment'] ?? '')) ?: null;
+        if (in_array($transition, ['Forward to university', 'College reject'], true)) {
+            Session::flash('error', 'College pass and rejection are recorded from the calculated average. They cannot be chosen manually.');
+            redirect('index.php?action=application_view&id=' . $entityId);
+        }
         if ($entityType !== 'research_application') {
             Session::flash('error', 'Unsupported entity type.');
             redirect('index.php');

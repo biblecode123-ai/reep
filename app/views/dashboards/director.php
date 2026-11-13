@@ -1,556 +1,247 @@
-<?php $title = 'Research Director Dashboard'; include APP_PATH . '/views/partials/header.php'; ?>
+<?php 
+$title = 'Research Director Executive Dashboard'; 
+include APP_PATH . '/views/partials/header.php'; 
+?>
 
 <div class="page-head">
-    <div>
-        <h1>Research Director Dashboard</h1>
-        <p>University research governance and monitoring.</p>
+    <div class="page-head-title">
+        <h1>Research Director Executive Dashboard</h1>
+        <p>University-wide research governance, calls management, and permanent evaluation committee oversight.</p>
+    </div>
+    <div class="page-head-actions">
+        <a class="btn btn-primary" href="<?= e(url('action=call_form')) ?>">➕ Create Research Call</a>
+        <a class="btn btn-secondary" href="<?= e(url('action=themes')) ?>">🏷️ Theme Catalogue</a>
+        <a class="btn btn-secondary" href="<?= e(url('action=rubrics')) ?>">📋 Global Rubrics</a>
+        <a class="btn btn-secondary" href="<?= e(url('action=committees')) ?>">🏛️ Committee</a>
     </div>
 </div>
 
-<!-- 1. Dashboard Summary Cards -->
-<div class="grid grid-4">
-<?php foreach ([
-  ['Active Research Calls', $stats['activeCalls'], 'calls_public'],
-  ['Awaiting Committee Assignment', $stats['awaitingCommitteeAssignment'], 'applications'],
-  ['University Evaluations In Progress', $stats['univEvaluationsInProgress'], 'applications'],
-  ['Completed Awaiting Decision', $stats['completedAwaitingDecision'], 'applications'],
-  ['Funding Decisions Pending', $stats['fundingDecisionsPending'], 'applications'],
-  ['Open Budget Appeals', $stats['openBudgetAppeals'], 'appeals'],
-  ['Open Rejected Appeals', $stats['openRejectedAppeals'], 'appeals'],
-  ['Appeals Awaiting Committee', $stats['appealsAwaitingCommittee'], 'appeals'],
-  ['Agreements Pending', $stats['agreementsPending'], 'agreements'],
-  ['Active Projects', $stats['activeProjectsAttention'], 'projects'],
-  ['Overdue Reports', $stats['overdueReports'], 'projects'],
-] as $c): ?>
-    <div class="stat">
-        <div class="num"><?= e($c[1]) ?></div>
-        <div class="lbl"><?= e($c[0]) ?></div>
+<!-- Executive Summary Cards -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Research Calls</span>
+            <span class="stat-icon">📢</span>
+        </div>
+        <div class="stat-value"><?= (int) ($stats['totalCalls'] ?? 0) ?></div>
+        <div class="stat-desc">
+            <span class="badge badge-ok"><?= (int) ($stats['publishedCalls'] ?? 0) ?> Active</span>
+            <span class="badge badge-danger"><?= (int) ($stats['closedCalls'] ?? 0) ?> Closed</span>
+        </div>
     </div>
-<?php endforeach; ?>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">Total Proposals</span>
+            <span class="stat-icon">📑</span>
+        </div>
+        <div class="stat-value"><?= (int) ($stats['totalProposals'] ?? 0) ?></div>
+        <div class="stat-desc">Submissions across all academic units</div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">College Stage</span>
+            <span class="stat-icon">🏫</span>
+        </div>
+        <div class="stat-value"><?= (int) ($stats['collegeEvaluationInProgress'] ?? 0) ?></div>
+        <div class="stat-desc">
+            <span class="badge badge-warning"><?= (int) ($stats['collegeAwaitingAssignment'] ?? 0) ?> Screening</span>
+            <span class="badge badge-ok"><?= (int) ($stats['collegeApproved'] ?? 0) ?> Approved</span>
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-header">
+            <span class="stat-label">University Evaluation</span>
+            <span class="stat-icon">⚖️</span>
+        </div>
+        <div class="stat-value"><?= (int) ($stats['univEvaluationsInProgress'] ?? 0) ?></div>
+        <div class="stat-desc">
+            <span class="badge badge-info"><?= (int) ($stats['awaitingUniversityEvaluation'] ?? 0) ?> Awaiting</span>
+            <span class="badge badge-ok"><?= (int) ($stats['finalDecisions'] ?? 0) ?> Decided</span>
+        </div>
+    </div>
 </div>
 
-<!-- 2. Priority Action Center -->
-<section>
-    <h2 class="section-title">Priority Action Center</h2>
+<!-- Priority Action Items Banner -->
+<?php if (!empty($pendingCommitteeAssignment) || !empty($completedAwaitingDecision)): ?>
+<div class="action-banner">
+    <div class="action-banner-content">
+        <h3>⚡ Actions Awaiting Director Oversight</h3>
+        <p>You have <strong><?= count($pendingCommitteeAssignment) ?></strong> college-approved proposals awaiting university committee assignment, and <strong><?= count($completedAwaitingDecision) ?></strong> proposals awaiting final decision recording.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <?php if (!empty($pendingCommitteeAssignment)): ?>
+            <a class="btn btn-primary btn-sm" href="#pendingUniversitySection">Assign Committee</a>
+        <?php endif; ?>
+        <?php if (!empty($completedAwaitingDecision)): ?>
+            <a class="btn btn-secondary btn-sm" href="#completedDecisionSection">Review Decisions</a>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
-    <!-- Proposals Awaiting Committee Assignment -->
-    <div class="card">
-        <h3 class="mt0">Proposals Awaiting University Evaluation Committee Assignment</h3>
-        <?php if (empty($pendingCommitteeAssignment)): ?>
-            <p class="muted">No proposals awaiting committee assignment.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>PI</th>
-                        <th>College</th>
-                        <th>Submitted</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
+<!-- Section 1: Proposals Awaiting University Committee Review -->
+<div class="card" id="pendingUniversitySection">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">College-Approved Proposals Forwarded to University</h2>
+            <div class="card-subtitle">Proposals that passed college-level evaluation (>= 50% threshold) and require committee routing</div>
+        </div>
+        <span class="badge badge-purple"><?= count($pendingCommitteeAssignment) ?> Pending</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Reference</th>
+                    <th>Proposal Title</th>
+                    <th>Principal Investigator</th>
+                    <th>College</th>
+                    <th>Submitted</th>
+                    <th>Current Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($pendingCommitteeAssignment)): ?>
+                    <tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">No proposals currently awaiting university assignment.</td></tr>
+                <?php else: ?>
                     <?php foreach ($pendingCommitteeAssignment as $a): ?>
                     <tr>
-                        <td><?= e($a['application_number']) ?></td>
-                        <td><?= e($a['title']) ?></td>
+                        <td><strong><?= e($a['application_number']) ?></strong></td>
+                        <td>
+                            <a href="<?= e(url('action=application_view&id=' . $a['id'])) ?>" style="font-weight:600;">
+                                <?= e($a['title']) ?>
+                            </a>
+                        </td>
                         <td><?= e($a['pi_name']) ?></td>
-                        <td><?= e($a['college_name'] ?? '') ?></td>
+                        <td><span class="badge badge-purple"><?= e($a['college_name'] ?? 'College') ?></span></td>
                         <td><?= e(format_date($a['submitted_at'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=app_committee_assign&id=' . $a['id'])) ?>">Assign Committee</a>
+                        <td><span class="badge badge-info"><?= e(status_label($a['status_code'])) ?></span></td>
+                        <td style="text-align: right;">
+                            <a class="btn btn-primary btn-sm" href="<?= e(url('action=committee_assign&application_id=' . $a['id'])) ?>">Assign Committee</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
+</div>
 
-    <!-- Committees Missing Required Members -->
-    <div class="card">
-        <h3 class="mt0">Committees Missing Required Members</h3>
-        <?php if (empty($committeesNeedingMembers)): ?>
-            <p class="muted">All committees have sufficient members.</p>
-        <?php else: ?>
-            <table class="tbl">
+<!-- Section 2: Permanent Committee & Meeting Overview -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+    <!-- Active Research Calls -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">Active Research Calls</h2>
+                <div class="card-subtitle">Calls currently published and open for researcher submissions</div>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= e(url('action=calls')) ?>">View All</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table">
                 <thead>
                     <tr>
-                        <th>Committee</th>
-                        <th>Type</th>
-                        <th>Current Members</th>
-                        <th>Required</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($committeesNeedingMembers as $c): ?>
-                    <tr>
-                        <td><?= e($c['name']) ?></td>
-                        <td><?= e($c['committee_type']) ?></td>
-                        <td><?= e($c['member_count']) ?></td>
-                        <td><?= e($c['quorum_size'] ?? 3) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=committee_members&id=' . $c['id'])) ?>">Manage Members</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Overdue Evaluations -->
-    <div class="card">
-        <h3 class="mt0">Overdue Evaluations</h3>
-        <?php if (empty($overdueEvaluations)): ?>
-            <p class="muted">No overdue evaluations.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
+                        <th>Call Title</th>
                         <th>Reference</th>
-                        <th>Title</th>
-                        <th>Evaluator</th>
                         <th>Deadline</th>
                         <th>Status</th>
-                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($overdueEvaluations as $e): ?>
-                    <tr class="danger">
-                        <td><?= e($e['application_number']) ?></td>
-                        <td><?= e($e['title']) ?></td>
-                        <td><?= e($e['evaluator_name']) ?></td>
-                        <td><?= e(format_date($e['deadline'])) ?></td>
-                        <td><?= e($e['status']) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=conflict_resolve&id=' . $e['id'])) ?>">Resolve</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
+                    <?php if (empty($activeCalls)): ?>
+                        <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No open research calls active.</td></tr>
+                    <?php else: ?>
+                        <?php foreach ($activeCalls as $call): ?>
+                        <tr>
+                            <td>
+                                <a href="<?= e(url('action=call_view&id=' . $call['id'])) ?>" style="font-weight:600;">
+                                    <?= e($call['title']) ?>
+                                </a>
+                            </td>
+                            <td><small><?= e($call['reference_number'] ?? '-') ?></small></td>
+                            <td style="white-space:nowrap;"><?= e(format_date($call['closes_at'])) ?></td>
+                            <td><span class="badge badge-ok"><?= e($call['status']) ?></span></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </tbody>
             </table>
-        <?php endif; ?>
+        </div>
     </div>
 
-    <!-- Completed Evaluations Awaiting Decision -->
-    <div class="card">
-        <h3 class="mt0">Completed Evaluations Awaiting Official Decision</h3>
-        <?php if (empty($completedAwaitingDecision)): ?>
-            <p class="muted">No completed evaluations awaiting decision.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
+    <!-- Permanent Committee Status -->
+    <div class="card" style="margin-bottom: 0;">
+        <div class="card-header">
+            <div>
+                <h2 class="card-title">Permanent Research Committee</h2>
+                <div class="card-subtitle">Standing university evaluation body governance</div>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="<?= e(url('action=committees')) ?>">Manage Committee</a>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+                <div style="flex: 1; padding: 14px; background: var(--bg-subtle); border-radius: var(--radius-md); text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--brand);"><?= (int) ($stats['activeCommitteeMembers'] ?? 0) ?></div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Active Members</div>
+                </div>
+                <div style="flex: 1; padding: 14px; background: var(--bg-subtle); border-radius: var(--radius-md); text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--ok);"><?= (int) ($stats['upcomingMeetings'] ?? 0) ?></div>
+                    <div style="font-size: 12px; color: var(--text-muted);">Scheduled Meetings</div>
+                </div>
+            </div>
+            <?php if (!empty($committeesNeedingMembers)): ?>
+                <div class="alert alert-warning" style="margin-bottom: 0;">
+                    <div>⚠️ <strong>Quorum Attention:</strong> Some evaluation committees have fewer than their required quorum size. Please appoint qualified faculty members.</div>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-success" style="margin-bottom: 0;">
+                    <div>✅ <strong>Quorum Satisfied:</strong> The standing university committee has active members and quorum.</div>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Recent Activity Stream -->
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h2 class="card-title">Recent Directorate & Evaluation Activity</h2>
+            <div class="card-subtitle">Audit stream of recent assessments, committee assignments, and decisions</div>
+        </div>
+        <a class="btn btn-secondary btn-sm" href="<?= e(url('action=audit')) ?>">View All Logs</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Actor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($recentActivity)): ?>
+                    <tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">No recent actions logged.</td></tr>
+                <?php else: ?>
+                    <?php foreach ($recentActivity as $act): ?>
                     <tr>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>PI</th>
-                        <th>Completed</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($completedAwaitingDecision as $a): ?>
-                    <tr>
-                        <td><?= e($a['application_number']) ?></td>
-                        <td><?= e($a['title']) ?></td>
-                        <td><?= e($a['pi_name']) ?></td>
-                        <td><?= e(format_date($a['evaluation_completed_at'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=app_committee_decide&id=' . $a['id'])) ?>">Record Decision</a>
-                        </td>
+                        <td style="white-space:nowrap;"><?= e(format_datetime($act['created_at'])) ?></td>
+                        <td><span class="badge badge-purple"><?= e($act['action']) ?></span></td>
+                        <td><code><?= e($act['entity_type']) ?> #<?= (int) $act['entity_id'] ?></code></td>
+                        <td><strong><?= e($act['actor_name'] ?? 'System') ?></strong></td>
                     </tr>
                     <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
-
-    <!-- Funding Decisions Pending -->
-    <div class="card">
-        <h3 class="mt0">Funding Decisions Awaiting Authorization</h3>
-        <?php if (empty($fundingDecisionsPending)): ?>
-            <p class="muted">No funding decisions pending.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>PI</th>
-                        <th>Requested</th>
-                        <th>Approved</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($fundingDecisionsPending as $f): ?>
-                    <tr>
-                        <td><?= e($f['application_number']) ?></td>
-                        <td><?= e($f['title']) ?></td>
-                        <td><?= e($f['pi_name']) ?></td>
-                        <td><?= e(number_format($f['budget_requested'], 2)) ?></td>
-                        <td><?= e($f['budget_approved_amount'] ? number_format($f['budget_approved_amount'], 2) : 'Pending') ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=application_budget&id=' . $f['id'])) ?>">Authorize</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Appeals Awaiting Review -->
-    <div class="card">
-        <h3 class="mt0">Appeals Awaiting Review or Committee Appointment</h3>
-        <?php if (empty($appealsAwaitingReview)): ?>
-            <p class="muted">No appeals awaiting review.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>PI</th>
-                        <th>Status</th>
-                        <th>Submitted</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($appealsAwaitingReview as $ap): ?>
-                    <tr>
-                        <td><?= e(ucfirst($ap['appealable_type'])) ?></td>
-                        <td><?= e($ap['application_number']) ?></td>
-                        <td><?= e($ap['title']) ?></td>
-                        <td><?= e($ap['pi_name']) ?></td>
-                        <td><?= e(ucfirst($ap['status'])) ?></td>
-                        <td><?= e(format_date($ap['submitted_at'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=appeals&id=' . $ap['id'])) ?>">Review</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Agreements Awaiting Signature -->
-    <div class="card">
-        <h3 class="mt0">Agreements Awaiting Signature</h3>
-        <?php if (empty($agreementsAwaitingSignature)): ?>
-            <p class="muted">No agreements awaiting signature.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>PI</th>
-                        <th>Version</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($agreementsAwaitingSignature as $ag): ?>
-                    <tr>
-                        <td><?= e($ag['application_number']) ?></td>
-                        <td><?= e($ag['title']) ?></td>
-                        <td><?= e($ag['pi_name']) ?></td>
-                        <td><?= e($ag['version']) ?></td>
-                        <td><?= e(ucfirst($ag['status'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=agreement_sign&id=' . $ag['id'])) ?>">Sign</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-
-    <!-- Projects with Overdue Reports -->
-    <div class="card">
-        <h3 class="mt0">Active Projects with Overdue Reports</h3>
-        <?php if (empty($projectsWithOverdueReports)): ?>
-            <p class="muted">No projects with overdue reports.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Project</th>
-                        <th>Title</th>
-                        <th>Due Date</th>
-                        <th>Report Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($projectsWithOverdueReports as $p): ?>
-                    <tr class="danger">
-                        <td><?= e($p['project_number']) ?></td>
-                        <td><?= e($p['title']) ?></td>
-                        <td><?= e(format_date($p['due_date'])) ?></td>
-                        <td><?= e(ucfirst($p['report_status'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $p['id'])) ?>">View Project</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-</section>
-
-<!-- 3. University Evaluation Management -->
-<section>
-    <h2 class="section-title">University Evaluation Management</h2>
-    <div class="grid grid-4">
-        <div class="stat">
-            <div class="num"><?= e($evaluationSummary['proposalsReceived']) ?></div>
-            <div class="lbl">Proposals Received</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($evaluationSummary['activeCommittees']) ?></div>
-            <div class="lbl">Active Committees</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($evaluationSummary['assignedEvaluators']) ?></div>
-            <div class="lbl">Assigned Evaluators</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($evaluationSummary['completedEvaluations']) ?></div>
-            <div class="lbl">Completed Evaluations</div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h3 class="mt0">Recent Committee Assignments</h3>
-        <p><a class="btn" href="<?= e(url('action=rubrics')) ?>">Manage Evaluation Rubrics</a></p>
-        <?php if (empty($recentCommitteeAssignments)): ?>
-            <p class="muted">No recent committee assignments.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Committee</th>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>Assigned</th>
-                        <th>Meeting Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($recentCommitteeAssignments as $a): ?>
-                    <tr>
-                        <td><?= e($a['committee_name']) ?></td>
-                        <td><?= e($a['application_number']) ?></td>
-                        <td><?= e($a['title']) ?></td>
-                        <td><?= e(format_date($a['assigned_at'])) ?></td>
-                        <td><?= e(format_date($a['meeting_date'] ?? '')) ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-</section>
-
-<!-- 4. Funding Overview -->
-<section>
-    <h2 class="section-title">Funding Overview</h2>
-    <div class="grid grid-4">
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['requestedBudget'], 2)) ?> ETB</div>
-            <div class="lbl">Requested Budget</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['committeeRecommended'], 2)) ?> ETB</div>
-            <div class="lbl">Committee Recommended</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['officiallyApproved'], 2)) ?> ETB</div>
-            <div class="lbl">Officially Approved</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['allocatedFunds'], 2)) ?> ETB</div>
-            <div class="lbl">Allocated Funds</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['disbursedFunds'], 2)) ?> ETB</div>
-            <div class="lbl">Disbursed Funds</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e(number_format($fundingOverview['reportedExpenditure'], 2)) ?> ETB</div>
-            <div class="lbl">Reported Expenditure</div>
-        </div>
-    </div>
-</section>
-
-<!-- 5. Appeals Overview -->
-<section>
-    <h2 class="section-title">Appeals Overview</h2>
-    <div class="grid grid-4">
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['budgetAppeals']) ?></div>
-            <div class="lbl">Budget Appeals</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['rejectedAppeals']) ?></div>
-            <div class="lbl">Rejected Proposal Appeals</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['pendingReview']) ?></div>
-            <div class="lbl">Pending Review</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['underReview']) ?></div>
-            <div class="lbl">Under Review</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['awaitingImplementation']) ?></div>
-            <div class="lbl">Awaiting Implementation</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($appealsSummary['closedAppeals']) ?></div>
-            <div class="lbl">Closed Appeals</div>
-        </div>
-    </div>
-</section>
-
-<!-- 6. Agreements and Project Monitoring -->
-<section>
-    <h2 class="section-title">Agreements and Project Monitoring</h2>
-    <div class="grid grid-4">
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['awaitingPreparation']) ?></div>
-            <div class="lbl">Awaiting Agreement Preparation</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['awaitingSignature']) ?></div>
-            <div class="lbl">Awaiting Signature</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['awaitingActivation']) ?></div>
-            <div class="lbl">Awaiting Activation</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['activeProjects']) ?></div>
-            <div class="lbl">Active Projects</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['extensionRequests']) ?></div>
-            <div class="lbl">Extension Requests</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['amendmentRequests']) ?></div>
-            <div class="lbl">Amendment Requests</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['awaitingFinalReport']) ?></div>
-            <div class="lbl">Awaiting Final Report</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($agreementsSummary['awaitingRepository']) ?></div>
-            <div class="lbl">Awaiting Repository</div>
-        </div>
-    </div>
-</section>
-
-<!-- 7. Research Calls and Themes -->
-<section>
-    <h2 class="section-title">Research Calls and Themes</h2>
-    <div class="grid grid-4">
-        <div class="stat">
-            <div class="num"><?= e($callsSummary['activeCalls']) ?></div>
-            <div class="lbl">Active Calls</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($callsSummary['upcomingCalls']) ?></div>
-            <div class="lbl">Upcoming Calls</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($callsSummary['closedCalls']) ?></div>
-            <div class="lbl">Closed Calls</div>
-        </div>
-        <div class="stat">
-            <div class="num"><?= e($callsSummary['archivedCalls']) ?></div>
-            <div class="lbl">Archived Calls</div>
-        </div>
-    </div>
-
-    <div class="card">
-        <h3 class="mt0">Active and Upcoming Calls</h3>
-        <?php if (empty($activeCalls)): ?>
-            <p class="muted">No active or upcoming calls.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Reference</th>
-                        <th>Title</th>
-                        <th>Opens</th>
-                        <th>Closes</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($activeCalls as $c): ?>
-                    <tr>
-                        <td><?= e($c['reference_number']) ?></td>
-                        <td><?= e($c['title']) ?></td>
-                        <td><?= e(format_date($c['opens_at'])) ?></td>
-                        <td><?= e(format_date($c['closes_at'])) ?></td>
-                        <td><?= e(ucfirst($c['status'])) ?></td>
-                        <td>
-                            <a class="btn-sm" href="<?= e(url('action=call_view&id=' . $c['id'])) ?>">View</a>
-                        </td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-</section>
-
-<!-- 8. Recent Activity and Alerts -->
-<section>
-    <h2 class="section-title">Recent Activity and Alerts</h2>
-    <div class="card">
-        <?php if (empty($recentActivity)): ?>
-            <p class="muted">No recent activity.</p>
-        <?php else: ?>
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Action</th>
-                        <th>Entity</th>
-                        <th>Actor</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($recentActivity as $a): ?>
-                    <tr>
-                        <td><?= e(str_replace('.', ' ', $a['action'])) ?></td>
-                        <td><?= e($a['entity_type']) ?> #<?= e($a['entity_id']) ?></td>
-                        <td><?= e($a['actor_name'] ?? 'System') ?></td>
-                        <td><?= e(format_date($a['created_at'])) ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php endif; ?>
-    </div>
-</section>
+</div>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>

@@ -67,8 +67,13 @@ final class ApplicationController
             }
         }
         $openCalls = CallModel::openCalls();
-        $themes = \App\Models\OrgModel::themes();
+        $selectedCallId = $app !== null ? (int) $app['call_id'] : ($callId ?: (int) ($openCalls[0]['id'] ?? 0));
+        $themes = $selectedCallId > 0 ? CallModel::themesForCall($selectedCallId) : [];
         $types = \App\Models\OrgModel::types();
+        $potentialCoInvestigators = Database::all(
+            "SELECT id, full_name, email, department_id FROM users WHERE is_active = 1 AND id != ? ORDER BY full_name ASC",
+            [Auth::id()]
+        );
         $workPlan = $id ? ApplicationModel::workPlan($id) : [];
         $appTeamMembers = [];
         if ($id) {
@@ -125,9 +130,16 @@ final class ApplicationController
             Session::flash('error', 'Your account has no college assigned. Contact the administrator.');
             redirect('index.php');
         }
+        $themeId = (int) ($_POST['research_theme_id'] ?? 0);
+        $allowedThemeIds = array_map('intval', array_column(CallModel::themesForCall((int) $call['id']), 'id'));
+        if ($themeId === 0 || !in_array($themeId, $allowedThemeIds, true)) {
+            Session::flash('error', 'Select exactly one research theme associated with this call.');
+            redirect('index.php?action=application_form' . ($id ? '&id=' . $id : '&call_id=' . (int) $call['id']));
+        }
         $data = [
             'call_id'         => (int) $call['id'],
             'title'           => $clean['title'],
+            'research_theme_id' => $themeId,
             'college_id'      => $collegeId,
             'department_id'   => ((int) $user['department_id']) ?: null,
             'abstract'        => trim((string) ($_POST['abstract'] ?? '')) ?: null,

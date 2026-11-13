@@ -139,15 +139,35 @@ final class DashboardController
 
     private static function adminDashboard(): void
     {
+        $scalar = fn(string $sql, array $p=[]) => (int) Database::scalar($sql, $p);
+
         $data = [
             'stats' => [
-                'total_users'  => (int) Database::scalar('SELECT COUNT(*) FROM users'),
-                'active_users' => (int) Database::scalar('SELECT COUNT(*) FROM users WHERE status = "active"'),
-                'colleges'     => (int) Database::scalar('SELECT COUNT(*) FROM colleges'),
-                'depts'        => (int) Database::scalar('SELECT COUNT(*) FROM departments'),
+                'total_users'        => $scalar('SELECT COUNT(*) FROM users'),
+                'active_users'       => $scalar('SELECT COUNT(*) FROM users WHERE status = "active"'),
+                'inactive_users'     => $scalar('SELECT COUNT(*) FROM users WHERE status <> "active"'),
+                'colleges'           => $scalar('SELECT COUNT(*) FROM colleges WHERE status = "active"'),
+                'depts'              => $scalar('SELECT COUNT(*) FROM departments WHERE status = "active"'),
+                'total_researchers'  => $scalar('SELECT COUNT(DISTINCT u.id) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name = "researcher"'),
+                'total_coordinators' => $scalar('SELECT COUNT(DISTINCT u.id) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name = "college_coordinator"'),
+                'total_directors'    => $scalar('SELECT COUNT(DISTINCT u.id) FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.name = "rpee_director"'),
+                'total_calls'        => $scalar('SELECT COUNT(*) FROM research_calls'),
+                'total_proposals'    => $scalar('SELECT COUNT(*) FROM research_applications'),
+                'active_projects'    => $scalar('SELECT COUNT(*) FROM research_projects WHERE status_code = "ACTIVE"'),
             ],
-            'roles' => Database::all('SELECT r.name, COUNT(ur.user_id) as cnt FROM roles r LEFT JOIN user_roles ur ON ur.role_id = r.id WHERE r.name IN ("system_admin", "researcher", "college_coordinator", "rpee_director") GROUP BY r.id'),
-            'recentLogs' => \App\Models\AuditLogModel::paginate([], 1, 10)['logs'],
+            'roles' => Database::all('SELECT r.display_name, r.name, COUNT(ur.user_id) as cnt 
+                                      FROM roles r 
+                                      LEFT JOIN user_roles ur ON ur.role_id = r.id 
+                                      WHERE r.name IN ("system_admin", "rpee_director", "college_coordinator", "researcher") 
+                                      GROUP BY r.id 
+                                      ORDER BY CASE r.name 
+                                          WHEN "system_admin" THEN 1 
+                                          WHEN "rpee_director" THEN 2 
+                                          WHEN "college_coordinator" THEN 3 
+                                          WHEN "researcher" THEN 4 
+                                          ELSE 5 END ASC'),
+            'collegeBreakdown' => Database::all('SELECT c.name, c.code, (SELECT COUNT(*) FROM departments d WHERE d.college_id = c.id) as dept_count, (SELECT COUNT(*) FROM users u WHERE u.college_id = c.id) as user_count, (SELECT COUNT(*) FROM research_applications a WHERE a.college_id = c.id) as app_count FROM colleges c WHERE c.status = "active" ORDER BY c.name ASC'),
+            'recentLogs' => \App\Models\AuditLogModel::paginate([], 1, 10)['logs'] ?? [],
         ];
         extract($data);
         include APP_PATH . '/views/dashboards/admin.php';

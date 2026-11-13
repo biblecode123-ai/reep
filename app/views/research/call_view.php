@@ -49,7 +49,7 @@ $appCount = (int) Database::scalar('SELECT COUNT(*) FROM research_applications W
       <dt>Research window</dt><dd><?= e(format_date($call['research_start_date'] ?? '')) ?> → <?= e(format_date($call['completion_deadline'] ?? '')) ?></dd>
       <dt>Max budget</dt><dd><?= e(format_money($call['max_budget'] ?? null, $call['budget_currency'] ?? 'ETB')) ?></dd>
       <dt>Max duration</dt><dd><?= e((string) ($call['max_duration_months'] ?? '—')) ?> months</dd>
-      <dt>Evaluation</dt><dd><?= e(ucfirst(str_replace('_', ' ', $call['evaluation_mode'] ?? ''))) ?> · <?= (int) ($call['required_evaluators'] ?? 0) ?> evaluator(s)</dd>
+      <dt>Evaluation</dt><dd><?= e(ucfirst(str_replace('_', ' ', $call['evaluation_mode'] ?? ''))) ?> · college average after at least 2 submitted assessments</dd>
       <dt>Applications</dt><dd><?= $appCount ?></dd>
     </dl>
   </div>

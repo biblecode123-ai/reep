@@ -368,9 +368,12 @@ final class EvaluationController
         }
         $app = ApplicationModel::find($appId);
         if (in_array($app['status_code'], ['UNDER_EVALUATION', 'RE_EVALUATION'], true)) {
-            $required = (int) (Database::scalar('SELECT required_evaluators FROM research_calls WHERE id = ?', [(int) $app['call_id']]) ?? 1);
-            $done = (int) Database::scalar('SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted"', [$appId]);
-            if ($done >= $required) {
+            // Minimum of two submitted assessments. Extra pending evaluators do not block.
+            $done = (int) Database::scalar(
+                'SELECT COUNT(*) FROM evaluations WHERE application_id = ? AND status = "submitted" AND evaluation_type = "proposal"',
+                [$appId]
+            );
+            if ($done >= 2) {
                 WorkflowService::fire($app, 'research_application', 'Submit evaluation', null);
             }
         }

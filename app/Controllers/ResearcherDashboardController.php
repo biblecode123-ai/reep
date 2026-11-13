@@ -19,10 +19,15 @@ final class ResearcherDashboardController
     {
         Gate::authorize('researcher.view');
         $userId = (int) Auth::id();
+        $user = Auth::user() ?? [];
         $scalar = fn(string $sql, array $p = []) => (int) Database::scalar($sql, $p);
 
         // Dashboard Summary Cards
         $stats = [
+            'totalProposals' => $scalar(
+                'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code <> "WITHDRAWN"',
+                [$userId]
+            ),
             'draftProposals' => $scalar(
                 'SELECT COUNT(*) FROM research_applications WHERE pi_user_id = ? AND status_code = "DRAFT"',
                 [$userId]
@@ -194,6 +199,7 @@ final class ResearcherDashboardController
             'unread' => $unread,
             'notifications' => $notifications,
             'profileCompletion' => self::getProfileCompletion($userId),
+            'user' => $user,
         ]);
         include APP_PATH . '/views/dashboards/researcher.php';
     }

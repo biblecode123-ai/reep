@@ -34,13 +34,16 @@ if (Gate::isAdmin()) {
     ];
 }
 // Show ONLY dashboard to researchers who don't have other roles.
-if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::hasRole('college_coordinator')) {
+$isResearcherWorkspace = Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::hasRole('college_coordinator');
+if ($isResearcherWorkspace) {
     $navMap = [
-        'researcher_dashboard' => ['Dashboard', 'researcher.view'],
-        'applications'   => ['My Proposals', 'research.view'],
-        'calls_public'   => ['Research Calls', 'research.create'],
-        'my_evaluations' => ['My Evaluations', 'research.evaluate'],
-        'repository'     => ['Repository', 'repository.view'],
+        'researcher_dashboard' => ['⌂  Dashboard', 'researcher.view'],
+        'applications'   => ['▤  My Proposals', 'research.view'],
+        'calls_public'   => ['◷  Research Calls', 'research.create'],
+        'projects'       => ['▱  Projects', 'project.view'],
+        'my_evaluations' => ['✓  Evaluations', 'research.evaluate'],
+        'notifications'  => ['♧  Notifications', 'researcher.view'],
+        'profile'         => ['◉  My Profile', 'researcher.view'],
     ];
 } elseif (Gate::hasRole('college_coordinator')) {
     $navMap = [
@@ -62,7 +65,7 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
 <link rel="stylesheet" href="<?= e(base_url('assets/css/app.css')) ?>">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="<?= Auth::check() ? 'app-shell' : e($bodyClass ?? '') ?>">
+<body class="<?= Auth::check() ? ('app-shell' . (!empty($isResearcherWorkspace) ? ' researcher-shell' : '')) : e($bodyClass ?? '') ?>">
 <?php if (Auth::check()): ?>
 <button type="button" class="menu-fab" id="navToggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
 <aside class="sidebar" id="sidebar">
@@ -89,12 +92,14 @@ if (Gate::hasRole('researcher') && Gate::denies('research.manage') && !Gate::has
     <?php endforeach; ?>
   </nav>
   <div class="side-user">
+    <?php if (empty($isResearcherWorkspace)): ?>
     <a class="bell" href="<?= e(url('action=notifications')) ?>" title="Notifications">
       🔔<?php if ($unreadCount > 0): ?><span class="bell-count"><?= e((string) $unreadCount) ?></span><?php endif; ?>
     </a>
+    <?php endif; ?>
     <span class="user-chip" title="<?= e($authUser['email'] ?? '') ?>"><?= e($authUser['full_name'] ?? '') ?></span>
     <div class="side-user-actions">
-      <a class="btn btn-ghost btn-sm" href="<?= e(url('action=profile')) ?>">Profile</a>
+      <?php if (empty($isResearcherWorkspace)): ?><a class="btn btn-ghost btn-sm" href="<?= e(url('action=profile')) ?>">Profile</a><?php endif; ?>
       <a class="btn btn-ghost btn-sm" href="<?= e(base_url('logout.php')) ?>">Logout</a>
     </div>
   </div>

@@ -35,7 +35,6 @@ final class CallModel
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
-             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE $whereSql
              ORDER BY c.created_at DESC
              LIMIT " . (int) $perPage . ' OFFSET ' . (int) (($page - 1) * $perPage),
@@ -51,7 +50,6 @@ final class CallModel
                     (SELECT COUNT(*) FROM research_applications a WHERE a.call_id = c.id) AS application_count
              FROM research_calls c
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
-             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE c.status IN ('published','open')
              ORDER BY c.opens_at ASC"
         );
@@ -65,7 +63,6 @@ final class CallModel
              FROM research_calls c
              LEFT JOIN users u ON u.id = c.created_by
              LEFT JOIN research_themes th ON th.id = c.research_theme_id
-             LEFT JOIN (SELECT ct.call_id, GROUP_CONCAT(t.name, ', ') AS theme_names FROM research_call_themes ct JOIN research_themes t ON t.id = ct.theme_id GROUP BY ct.call_id) cthemes ON cthemes.call_id = c.id
              WHERE c.id = ?',
             [$id]
         );
@@ -92,11 +89,11 @@ final class CallModel
     {
         $themeIds = array_values(array_unique(array_filter(array_map('intval', $themeIds), static fn(int $id): bool => $id > 0)));
         if ($themeIds === []) {
-            throw new \\InvalidArgumentException('Select at least one research theme for this call.');
+            throw new \InvalidArgumentException('Select at least one research theme for this call.');
         }
         foreach ($themeIds as $themeId) {
             if ((int) Database::scalar('SELECT COUNT(*) FROM research_themes WHERE id = ? AND status = "active"', [$themeId]) !== 1) {
-                throw new \\InvalidArgumentException('One or more selected themes are unavailable.');
+                throw new \InvalidArgumentException('One or more selected themes are unavailable.');
             }
         }
         Database::transaction(function () use ($callId, $themeIds): void {

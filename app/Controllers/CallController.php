@@ -39,6 +39,7 @@ final class CallController
         $criteria = $id ? CallModel::criteria($id) : [];
         $colleges = \App\Models\OrgModel::colleges(true);
         $themes = \App\Models\OrgModel::themes();
+        $selectedThemes = $id ? CallModel::themes($id) : [];
         $docTypes = \App\Models\OrgModel::documentTypes();
         include APP_PATH . '/views/research/call_form.php';
     }
@@ -225,6 +226,7 @@ final class CallController
         $criteria = CallModel::criteria($id);
         $colleges = \App\Models\OrgModel::colleges();
         $themes = \App\Models\OrgModel::themes();
+        $callThemes = CallModel::themes($id);
         $docTypes = \App\Models\OrgModel::documentTypes();
         include APP_PATH . '/views/research/call_view.php';
     }

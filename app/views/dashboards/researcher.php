@@ -1,370 +1,198 @@
 <?php
 $title = 'Researcher Dashboard';
 include APP_PATH . '/views/partials/header.php';
+
+$draftCount = (int) ($stats['draftProposals'] ?? 0);
+$submittedCount = (int) ($stats['submittedProposals'] ?? 0);
+$projectCount = (int) ($stats['activeProjects'] ?? 0);
+$evaluationCount = (int) ($stats['pendingEvaluations'] ?? 0);
+$profilePercent = max(0, min(100, (int) ($profileCompletion ?? 0)));
 ?>
 
-<div class="page-head">
-  <div><h1>Researcher Dashboard</h1></div>
+<div class="researcher-dashboard">
+  <section class="rd-welcome">
+    <div class="rd-welcome-copy">
+      <span class="rd-eyebrow"><span class="rd-eyebrow-dot"></span> RESEARCHER WORKSPACE</span>
+      <h1>Welcome to your research workspace</h1>
+      <p>Track your proposals, respond to evaluation assignments, and manage your research activities in one place.</p>
+    </div>
+    <div class="rd-welcome-actions">
+      <a class="btn" href="<?= e(url('action=calls_public')) ?>">Explore Research Calls <span aria-hidden="true">→</span></a>
+      <a class="btn btn-outline" href="<?= e(url('action=applications')) ?>">My Proposals</a>
+    </div>
+  </section>
+
+  <section class="rd-stat-grid" aria-label="Research activity summary">
+    <a class="rd-stat rd-stat-purple" href="<?= e(url('action=applications')) ?>">
+      <span class="rd-stat-icon" aria-hidden="true">▤</span>
+      <span class="rd-stat-value"><?= $draftCount ?></span>
+      <span class="rd-stat-label">Draft proposals</span>
+      <span class="rd-stat-foot">Continue your drafts <span aria-hidden="true">↗</span></span>
+    </a>
+    <a class="rd-stat rd-stat-blue" href="<?= e(url('action=applications')) ?>">
+      <span class="rd-stat-icon" aria-hidden="true">↗</span>
+      <span class="rd-stat-value"><?= $submittedCount ?></span>
+      <span class="rd-stat-label">Submitted proposals</span>
+      <span class="rd-stat-foot">Track proposal status <span aria-hidden="true">↗</span></span>
+    </a>
+    <a class="rd-stat rd-stat-green" href="<?= e(url('action=projects')) ?>">
+      <span class="rd-stat-icon" aria-hidden="true">⌂</span>
+      <span class="rd-stat-value"><?= $projectCount ?></span>
+      <span class="rd-stat-label">Active projects</span>
+      <span class="rd-stat-foot">View project activity <span aria-hidden="true">↗</span></span>
+    </a>
+    <a class="rd-stat rd-stat-amber" href="<?= e(url('action=my_evaluations')) ?>">
+      <span class="rd-stat-icon" aria-hidden="true">✓</span>
+      <span class="rd-stat-value"><?= $evaluationCount ?></span>
+      <span class="rd-stat-label">Pending evaluations</span>
+      <span class="rd-stat-foot">Assignments needing action <span aria-hidden="true">↗</span></span>
+    </a>
+  </section>
+
+  <div class="rd-main-grid">
+    <div class="rd-primary-column">
+      <section class="rd-panel">
+        <div class="rd-panel-heading">
+          <div>
+            <span class="rd-kicker">YOUR SUBMISSIONS</span>
+            <h2>My proposals</h2>
+            <p>Follow the progress of your research applications.</p>
+          </div>
+          <a class="rd-text-link" href="<?= e(url('action=applications')) ?>">View all proposals <span aria-hidden="true">→</span></a>
+        </div>
+
+        <?php if ($underRevision): ?>
+          <div class="rd-attention">
+            <span class="rd-attention-icon" aria-hidden="true">!</span>
+            <div><strong><?= count($underRevision) ?> proposal<?= count($underRevision) === 1 ? '' : 's' ?> need revision</strong><span>Review the feedback and submit the requested changes.</span></div>
+            <a class="btn btn-sm" href="<?= e(url('action=application_view&id=' . $underRevision[0]['id'])) ?>">Review request</a>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($submittedProposals || $draftProposals): ?>
+          <div class="rd-table-wrap">
+            <table class="tbl rd-table">
+              <thead><tr><th>Proposal</th><th>Research call</th><th>Status</th><th>Last activity</th><th></th></tr></thead>
+              <tbody>
+                <?php foreach ($submittedProposals as $app): ?>
+                  <tr>
+                    <td><strong><?= e($app['title']) ?></strong><small><?= e($app['application_number'] ?? 'Submitted proposal') ?></small></td>
+                    <td><?= e($app['call_title'] ?? '—') ?></td>
+                    <td><span class="badge <?= e(status_badge($app['status_code'])) ?>"><?= e(ucwords(strtolower(str_replace('_', ' ', $app['status_code'])))) ?></span></td>
+                    <td><?= e(format_date($app['submitted_at'])) ?></td>
+                    <td><a class="rd-row-action" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">View <span aria-hidden="true">→</span></a></td>
+                  </tr>
+                <?php endforeach; ?>
+                <?php foreach ($draftProposals as $app): ?>
+                  <tr>
+                    <td><strong><?= e($app['title']) ?></strong><small>Draft proposal</small></td>
+                    <td><?= e($app['call_title'] ?? '—') ?></td>
+                    <td><span class="badge badge-secondary">Draft</span></td>
+                    <td><?= e(format_date($app['created_at'])) ?></td>
+                    <td><a class="rd-row-action" href="<?= e(url('action=application_form&id=' . $app['id'])) ?>">Continue <span aria-hidden="true">→</span></a></td>
+                  </tr>
+                <?php endforeach; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php else: ?>
+          <div class="rd-empty">
+            <span class="rd-empty-icon" aria-hidden="true">▤</span>
+            <strong>No proposals yet</strong>
+            <p>Explore an open research call and start preparing your proposal.</p>
+            <a class="btn btn-sm" href="<?= e(url('action=calls_public')) ?>">Browse research calls</a>
+          </div>
+        <?php endif; ?>
+      </section>
+
+      <?php if ($pendingEvaluations): ?>
+      <section class="rd-panel">
+        <div class="rd-panel-heading">
+          <div><span class="rd-kicker">YOUR REVIEW RESPONSIBILITIES</span><h2>Evaluation assignments</h2><p>Research proposals assigned to you for assessment.</p></div>
+          <a class="rd-text-link" href="<?= e(url('action=my_evaluations')) ?>">View all <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="rd-task-list">
+          <?php foreach ($pendingEvaluations as $eval): ?>
+            <div class="rd-task">
+              <span class="rd-task-icon" aria-hidden="true">✓</span>
+              <div class="rd-task-copy"><strong><?= e($eval['title']) ?></strong><span><?= e($eval['application_number']) ?> · Principal researcher: <?= e($eval['pi_name']) ?></span></div>
+              <div class="rd-task-meta"><span class="badge badge-warning">Awaiting evaluation</span><small>Deadline: <?= e(format_date($eval['deadline'])) ?></small></div>
+              <a class="btn btn-sm" href="<?= e(url('action=evaluation_form&id=' . $eval['id'])) ?>">Evaluate</a>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      </section>
+      <?php endif; ?>
+
+      <section class="rd-panel">
+        <div class="rd-panel-heading">
+          <div><span class="rd-kicker">FUNDed RESEARCH</span><h2>Active projects</h2><p>Monitor projects where you are an active team member.</p></div>
+          <a class="rd-text-link" href="<?= e(url('action=projects')) ?>">View projects <span aria-hidden="true">→</span></a>
+        </div>
+        <?php if ($activeProjects): ?>
+          <div class="rd-table-wrap"><table class="tbl rd-table"><thead><tr><th>Project</th><th>Start date</th><th>Planned end</th><th>Reports due</th><th></th></tr></thead><tbody>
+          <?php foreach ($activeProjects as $proj): ?>
+            <tr><td><strong><?= e($proj['title']) ?></strong><small><?= e($proj['project_number']) ?></small></td><td><?= e(format_date($proj['actual_start'])) ?></td><td><?= e(format_date($proj['planned_end'])) ?></td><td><?= (int) $proj['pending_reports'] ?></td><td><a class="rd-row-action" href="<?= e(url('action=project_view&id=' . $proj['id'])) ?>">Open <span aria-hidden="true">→</span></a></td></tr>
+          <?php endforeach; ?>
+          </tbody></table></div>
+        <?php else: ?>
+          <div class="rd-inline-empty">You are not currently listed on an active research project.</div>
+        <?php endif; ?>
+      </section>
+
+      <?php if ($pendingAgreements || $pendingReports || $overdueReports): ?>
+      <section class="rd-panel">
+        <div class="rd-panel-heading"><div><span class="rd-kicker">FOLLOW-UP REQUIRED</span><h2>Research administration</h2><p>Agreements and reporting items that may need your attention.</p></div></div>
+        <?php if ($pendingAgreements): ?><div class="rd-simple-list"><?php foreach ($pendingAgreements as $ag): ?><div><span class="rd-list-dot"></span><div><strong><?= e($ag['title']) ?></strong><small>Agreement v<?= e((string) $ag['version']) ?> · <?= e(ucfirst($ag['status'])) ?></small></div><a class="rd-row-action" href="<?= e(url('action=application_view&id=' . $ag['id'])) ?>">Open</a></div><?php endforeach; ?></div><?php endif; ?>
+        <?php if ($pendingReports): ?><div class="rd-simple-list"><?php foreach ($pendingReports as $report): ?><div><span class="rd-list-dot rd-dot-blue"></span><div><strong><?= e($report['title']) ?></strong><small><?= e($report['report_number']) ?> · Due <?= e(format_date($report['period_end'])) ?></small></div><a class="rd-row-action" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Open</a></div><?php endforeach; ?></div><?php endif; ?>
+        <?php if ($overdueReports): ?><div class="rd-simple-list"><?php foreach ($overdueReports as $report): ?><div><span class="rd-list-dot rd-dot-red"></span><div><strong><?= e($report['title']) ?></strong><small><?= e($report['report_number']) ?> · <?= (int) $report['days_overdue'] ?> days overdue</small></div><a class="rd-row-action" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Open</a></div><?php endforeach; ?></div><?php endif; ?>
+      </section>
+      <?php endif; ?>
+    </div>
+
+    <aside class="rd-side-column">
+      <section class="rd-panel rd-profile-panel">
+        <div class="rd-panel-heading rd-panel-heading-tight"><div><span class="rd-kicker">YOUR PROFILE</span><h2>Profile strength</h2></div><span class="rd-percent"><?= $profilePercent ?>%</span></div>
+        <div class="rd-progress-track"><span style="width: <?= $profilePercent ?>%"></span></div>
+        <p class="rd-muted-copy"><?= $profilePercent >= 100 ? 'Your researcher profile is complete.' : 'Complete your academic and research information to strengthen your researcher profile.' ?></p>
+        <a class="btn btn-outline btn-block" href="<?= e(url('action=profile')) ?>">Update my profile</a>
+      </section>
+
+      <section class="rd-panel">
+        <div class="rd-panel-heading"><div><span class="rd-kicker">OPPORTUNITIES</span><h2>Open research calls</h2><p>Find opportunities that match your research interests.</p></div></div>
+        <?php if ($openCalls): ?>
+          <div class="rd-call-list">
+            <?php foreach (array_slice($openCalls, 0, 5) as $call): ?>
+              <article class="rd-call">
+                <span class="rd-call-mark" aria-hidden="true">✦</span>
+                <div class="rd-call-copy"><strong><?= e($call['title']) ?></strong><small><?= e($call['call_number']) ?></small><small>Closes <?= e(format_datetime($call['closes_at'])) ?></small></div>
+                <a class="rd-icon-link" aria-label="View research call" href="<?= e(url('action=call_view&id=' . $call['id'])) ?>">↗</a>
+              </article>
+            <?php endforeach; ?>
+          </div>
+          <a class="rd-panel-footer-link" href="<?= e(url('action=calls_public')) ?>">Browse all research calls <span aria-hidden="true">→</span></a>
+        <?php else: ?>
+          <div class="rd-inline-empty">There are no open research calls at the moment.</div>
+        <?php endif; ?>
+      </section>
+
+      <?php if ($notifications): ?>
+      <section class="rd-panel">
+        <div class="rd-panel-heading"><div><span class="rd-kicker">LATEST UPDATES</span><h2>Recent notifications</h2></div><span class="rd-notification-count"><?= (int) $unread ?> unread</span></div>
+        <div class="rd-notification-list">
+          <?php foreach (array_slice($notifications, 0, 5) as $notif): ?>
+            <a href="<?= e($notif['link_url'] ?: url('action=notifications')) ?>" class="rd-notification">
+              <span class="rd-notification-dot"></span><span><strong><?= e($notif['title']) ?></strong><small><?= e($notif['body'] ?? '') ?></small><small><?= e(format_datetime($notif['created_at'])) ?></small></span>
+            </a>
+          <?php endforeach; ?>
+        </div>
+        <a class="rd-panel-footer-link" href="<?= e(url('action=notifications')) ?>">View notifications <span aria-hidden="true">→</span></a>
+      </section>
+      <?php else: ?>
+      <section class="rd-panel rd-notice-empty"><span class="rd-notice-icon" aria-hidden="true">♧</span><strong>You're all caught up</strong><p>No unread notifications right now.</p><a class="rd-panel-footer-link" href="<?= e(url('action=notifications')) ?>">Open notification center <span aria-hidden="true">→</span></a></section>
+      <?php endif; ?>
+    </aside>
+  </div>
 </div>
-
-<!-- Summary Cards -->
-<section>
-  <h2 class="section-title">Summary</h2>
-  <div class="grid grid-4">
-    <div class="stat">
-      <div class="num"><?= $stats['draftProposals'] ?></div>
-      <div class="lbl">Draft Proposals</div>
-    </div>
-    <div class="stat">
-      <div class="num"><?= $stats['submittedProposals'] ?></div>
-      <div class="lbl">Submitted Proposals</div>
-    </div>
-    <div class="stat">
-      <div class="num"><?= $stats['activeProjects'] ?></div>
-      <div class="lbl">Active Projects</div>
-    </div>
-    <div class="stat">
-      <div class="num"><?= $stats['pendingEvaluations'] ?></div>
-      <div class="lbl">Pending Evaluations</div>
-    </div>
-  </div>
-</section>
-
-<!-- Profile Completion -->
-<section>
-  <h2 class="section-title">Profile Completion</h2>
-  <div class="card">
-    <h3>Profile Completion: <?= $profileCompletion ?>%</h3>
-    <div class="completion-bar"><div class="completion-fill" style="width: <?= $profileCompletion ?>%;"></div></div>
-    <a class="btn btn-sm" href="<?= e(url('action=profile')) ?>">Complete your profile</a>
-  </div>
-</section>
-
-<!-- Draft Proposals -->
-<section>
-  <h2 class="section-title">Draft Proposals</h2>
-  <?php if ($draftProposals): ?>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Title</th>
-        <th>Call</th>
-        <th>Created</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($draftProposals as $app): ?>
-      <tr>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['call_title'] ?? '—') ?></td>
-        <td><?= e(format_date($app['created_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_form&id=' . $app['id'])) ?>">Edit</a>
-          <a class="btn-sm" href="<?= e(url('action=application_submit&id=' . $app['id'])) ?>">Submit</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php else: ?>
-  <p class="muted">No draft proposals.</p>
-  <?php endif; ?>
-</section>
-
-<!-- Submitted Proposals -->
-<section>
-  <h2 class="section-title">Submitted Proposals</h2>
-  <?php if ($submittedProposals): ?>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>Call</th>
-        <th>Status</th>
-        <th>Submitted</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($submittedProposals as $app): ?>
-      <tr>
-        <td><?= e($app['application_number']) ?></td>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['call_title'] ?? '—') ?></td>
-        <td><span class="badge <?= status_badge($app['status_code']) ?>"><?= e($app['status_code']) ?></span></td>
-        <td><?= e(format_date($app['submitted_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">View</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php else: ?>
-  <p class="muted">No submitted proposals.</p>
-  <?php endif; ?>
-</section>
-
-<!-- Under Revision -->
-<?php if ($underRevision): ?>
-<section>
-  <h2 class="section-title">Proposals Under Revision</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>Revision Reason</th>
-        <th>Requested</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($underRevision as $app): ?>
-      <tr class="warning">
-        <td><?= e($app['application_number']) ?></td>
-        <td><?= e($app['title']) ?></td>
-        <td><?= e($app['request_reason']) ?></td>
-        <td><?= e(format_date($app['requested_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $app['id'])) ?>">Revise</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endif; ?>
-
-<!-- Active Projects -->
-<section>
-  <h2 class="section-title">Active Projects</h2>
-  <?php if ($activeProjects): ?>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>Started</th>
-        <th>Planned End</th>
-        <th>Pending Reports</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($activeProjects as $proj): ?>
-      <tr>
-        <td><?= e($proj['project_number']) ?></td>
-        <td><?= e($proj['title']) ?></td>
-        <td><?= e(format_date($proj['actual_start'])) ?></td>
-        <td><?= e(format_date($proj['planned_end'])) ?></td>
-        <td><?= (int)$proj['pending_reports'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $proj['id'])) ?>">View</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php else: ?>
-  <p class="muted">No active projects.</p>
-  <?php endif; ?>
-</section>
-
-<!-- Pending Agreements -->
-<?php if ($pendingAgreements): ?>
-<section>
-  <h2 class="section-title">Pending Agreements</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>Version</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($pendingAgreements as $ag): ?>
-      <tr>
-        <td><?= e($ag['application_number']) ?></td>
-        <td><?= e($ag['title']) ?></td>
-        <td><?= e($ag['version']) ?></td>
-        <td><span class="badge <?= status_badge($ag['status']) ?>"><?= e($ag['status']) ?></span></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=application_view&id=' . $ag['id'])) ?>">Sign</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endif; ?>
-
-<!-- Pending Progress Reports -->
-<?php if ($pendingReports): ?>
-<section>
-  <h2 class="section-title">Progress Reports Due Soon</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Report Number</th>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>Due Date</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($pendingReports as $report): ?>
-      <tr>
-        <td><?= e($report['report_number']) ?></td>
-        <td><?= e($report['project_number']) ?></td>
-        <td><?= e($report['title']) ?></td>
-        <td><?= e(format_date($report['period_end'])) ?></td>
-        <td><span class="badge <?= status_badge($report['status']) ?>"><?= e($report['status']) ?></span></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Submit</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endif; ?>
-
-<!-- Overdue Reports -->
-<?php if ($overdueReports): ?>
-<section>
-  <h2 class="section-title">Overdue Reports</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Report Number</th>
-        <th>Project Number</th>
-        <th>Title</th>
-        <th>Due Date</th>
-        <th>Days Overdue</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($overdueReports as $report): ?>
-      <tr class="danger">
-        <td><?= e($report['report_number']) ?></td>
-        <td><?= e($report['project_number']) ?></td>
-        <td><?= e($report['title']) ?></td>
-        <td><?= e(format_date($report['period_end'])) ?></td>
-        <td><?= (int)$report['days_overdue'] ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=project_view&id=' . $report['id'])) ?>">Submit</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endif; ?>
-
-<!-- Pending Evaluations -->
-<?php if ($pendingEvaluations): ?>
-<section>
-  <h2 class="section-title">Pending Evaluations</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Application Number</th>
-        <th>Title</th>
-        <th>PI</th>
-        <th>Deadline</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($pendingEvaluations as $eval): ?>
-      <tr>
-        <td><?= e($eval['application_number']) ?></td>
-        <td><?= e($eval['title']) ?></td>
-        <td><?= e($eval['pi_name']) ?></td>
-        <td><?= e(format_date($eval['deadline'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=evaluation_form&id=' . $eval['id'])) ?>">Evaluate</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-</section>
-<?php endif; ?>
-
-<!-- Open Calls -->
-<section>
-  <h2 class="section-title">Open Research Calls</h2>
-  <?php if ($openCalls): ?>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Call Number</th>
-        <th>Title</th>
-        <th>Closing Date</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($openCalls as $call): ?>
-      <tr>
-        <td><?= e($call['call_number']) ?></td>
-        <td><?= e($call['title']) ?></td>
-        <td><?= e(format_datetime($call['closes_at'])) ?></td>
-        <td>
-          <a class="btn-sm" href="<?= e(url('action=call_view&id=' . $call['id'])) ?>">View</a>
-          <a class="btn-sm" href="<?= e(url('action=application_form&call_id=' . $call['id'])) ?>">Apply</a>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php else: ?>
-  <p class="muted">No open calls at this time.</p>
-  <?php endif; ?>
-</section>
-
-<!-- Notifications -->
-<?php if ($notifications): ?>
-<section>
-  <h2 class="section-title">Recent Notifications</h2>
-  <table class="tbl">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Title</th>
-        <th>Message</th>
-        <th>Date</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($notifications as $notif): ?>
-      <tr>
-        <td><?= e(ucfirst(str_replace('_', ' ', $notif['notification_type']))) ?></td>
-        <td><?= e($notif['title']) ?></td>
-        <td><?= e($notif['body'] ?? '—') ?></td>
-        <td><?= e(format_datetime($notif['created_at'])) ?></td>
-        <td>
-          <?php if ($notif['link_url']): ?>
-          <a class="btn-sm" href="<?= e($notif['link_url']) ?>">View</a>
-          <?php endif; ?>
-        </td>
-      </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
-  <a class="btn btn-sm" href="<?= e(url('action=notifications')) ?>">View All Notifications</a>
-</section>
-<?php endif; ?>
 
 <?php include APP_PATH . '/views/partials/footer.php'; ?>
